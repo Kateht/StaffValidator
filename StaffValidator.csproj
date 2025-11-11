@@ -1,0 +1,6 @@
+<Project Sdk="Microsoft.Build.NoTargets">
+  <PropertyGroup>
+    <!-- This is a container project used to keep the repository root tidy. Individual subprojects are the real build targets. -->
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+</Project>

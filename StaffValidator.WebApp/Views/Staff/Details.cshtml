@@ -1,0 +1,239 @@
+@model StaffValidator.Core.Models.Staff
+@{
+    ViewData["Title"] = $"Staff Details - {Model.StaffName}";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-10">
+        <!-- Header Section -->
+        <div class="d-flex justify-content-between align-items-center mb-4">
+            <div>
+                <h1 class="h3 mb-1">
+                    <i class="bi bi-person-circle text-primary me-2"></i>Staff Details
+                </h1>
+                <nav aria-label="breadcrumb">
+                    <ol class="breadcrumb mb-0">
+                        <li class="breadcrumb-item"><a href="@Url.Action("Index")">Staff List</a></li>
+                        <li class="breadcrumb-item active">@Model.StaffName</li>
+                    </ol>
+                </nav>
+            </div>
+            <div class="btn-group">
+                <a href="@Url.Action("Edit", new { id = Model.StaffID })" class="btn btn-primary">
+                    <i class="bi bi-pencil me-1"></i>Edit
+                </a>
+                <a href="@Url.Action("Index")" class="btn btn-outline-secondary">
+                    <i class="bi bi-arrow-left me-1"></i>Back to List
+                </a>
+            </div>
+        </div>
+
+        <div class="row">
+            <!-- Main Info Card -->
+            <div class="col-lg-8 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <h5 class="mb-0">
+                            <i class="bi bi-info-circle me-2"></i>Personal Information
+                        </h5>
+                    </div>
+                    <div class="card-body">
+                        <div class="row g-4">
+                            <div class="col-md-6">
+                                <div class="info-item">
+                                    <label class="text-muted small fw-medium mb-1">
+                                        <i class="bi bi-hash me-1"></i>Staff ID
+                                    </label>
+                                    <div class="fw-medium">
+                                        <span class="badge bg-light text-dark fs-6">#@Model.StaffID</span>
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-item">
+                                    <label class="text-muted small fw-medium mb-1">
+                                        <i class="bi bi-person me-1"></i>Full Name
+                                    </label>
+                                    <div class="fw-medium fs-5">@Model.StaffName</div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-item">
+                                    <label class="text-muted small fw-medium mb-1">
+                                        <i class="bi bi-envelope me-1"></i>Email Address
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        @if (Model.Email.Contains("@") && Model.Email.Contains("."))
+                                        {
+                                            <i class="bi bi-check-circle text-success me-2"></i>
+                                            <a href="mailto:@Model.Email" class="text-decoration-none">@Model.Email</a>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+                                            <span class="text-muted">@Model.Email</span>
+                                            <small class="text-warning ms-2">(Invalid format)</small>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-md-6">
+                                <div class="info-item">
+                                    <label class="text-muted small fw-medium mb-1">
+                                        <i class="bi bi-telephone me-1"></i>Phone Number
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        @if (!string.IsNullOrWhiteSpace(Model.PhoneNumber) && Model.PhoneNumber.Length >= 10)
+                                        {
+                                            <i class="bi bi-check-circle text-success me-2"></i>
+                                            <a href="tel:@Model.PhoneNumber" class="text-decoration-none">@Model.PhoneNumber</a>
+                                        }
+                                        else
+                                        {
+                                            <i class="bi bi-exclamation-triangle text-warning me-2"></i>
+                                            <span class="text-muted">@Model.PhoneNumber</span>
+                                            <small class="text-warning ms-2">(Check format)</small>
+                                        }
+                                    </div>
+                                </div>
+                            </div>
+                            <div class="col-12">
+                                <div class="info-item">
+                                    <label class="text-muted small fw-medium mb-1">
+                                        <i class="bi bi-calendar-event me-1"></i>Starting Date
+                                    </label>
+                                    <div class="d-flex align-items-center">
+                                        <span class="fw-medium">@Model.StartingDate.ToString("MMMM dd, yyyy")</span>
+                                        <span class="text-muted ms-3">
+                                            (@Math.Round((DateTime.Now - Model.StartingDate).TotalDays / 365.25, 1) years ago)
+                                        </span>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Photo Card -->
+            <div class="col-lg-4 mb-4">
+                <div class="card shadow-sm h-100">
+                    <div class="card-header bg-white">
+                        <h6 class="mb-0">
+                            <i class="bi bi-image me-2"></i>Profile Photo
+                        </h6>
+                    </div>
+                    <div class="card-body text-center">
+                        @if (!string.IsNullOrEmpty(Model.PhotoPath))
+                        {
+                            <div class="mb-3">
+                                <img src="@Model.PhotoPath" 
+                                     class="img-fluid rounded shadow-sm" 
+                                     alt="@Model.StaffName"
+                                     style="max-height: 300px; object-fit: cover;" />
+                            </div>
+                            <div class="d-grid">
+                                <button type="button" class="btn btn-outline-primary btn-sm" 
+                                        onclick="openPhotoModal('@Model.PhotoPath', '@Model.StaffName')">
+                                    <i class="bi bi-zoom-in me-1"></i>View Full Size
+                                </button>
+                            </div>
+                        }
+                        else
+                        {
+                            <div class="py-5">
+                                <i class="bi bi-person-circle display-1 text-muted mb-3"></i>
+                                <p class="text-muted mb-0">No photo available</p>
+                                <small class="text-muted">Upload a photo when editing this staff member</small>
+                            </div>
+                        }
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Actions Card -->
+        <div class="card shadow-sm">
+            <div class="card-header bg-light">
+                <h6 class="mb-0">
+                    <i class="bi bi-gear me-2"></i>Quick Actions
+                </h6>
+            </div>
+            <div class="card-body">
+                <div class="d-flex flex-wrap gap-2">
+                    <a href="@Url.Action("Edit", new { id = Model.StaffID })" class="btn btn-primary">
+                        <i class="bi bi-pencil me-1"></i>Edit Information
+                    </a>
+                    <a href="mailto:@Model.Email" class="btn btn-outline-secondary">
+                        <i class="bi bi-envelope me-1"></i>Send Email
+                    </a>
+                    <a href="tel:@Model.PhoneNumber" class="btn btn-outline-secondary">
+                        <i class="bi bi-telephone me-1"></i>Call Phone
+                    </a>
+                    <button type="button" class="btn btn-outline-info" onclick="exportStaffInfo()">
+                        <i class="bi bi-download me-1"></i>Export Info
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+<!-- Photo Modal -->
+<div class="modal fade" id="photoModal" tabindex="-1">
+    <div class="modal-dialog modal-lg modal-dialog-centered">
+        <div class="modal-content">
+            <div class="modal-header">
+                <h5 class="modal-title" id="photoModalTitle"></h5>
+                <button type="button" class="btn-close" data-bs-dismiss="modal"></button>
+            </div>
+            <div class="modal-body text-center">
+                <img id="photoModalImage" src="" class="img-fluid" alt="" />
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+function openPhotoModal(photoUrl, staffName) {
+    document.getElementById('photoModalImage').src = photoUrl;
+    document.getElementById('photoModalTitle').textContent = staffName + ' - Profile Photo';
+    new bootstrap.Modal(document.getElementById('photoModal')).show();
+}
+
+function exportStaffInfo() {
+    const staffData = {
+        id: '@Model.StaffID',
+        name: '@Model.StaffName',
+        email: '@Model.Email',
+        phone: '@Model.PhoneNumber',
+        startingDate: '@Model.StartingDate.ToString("yyyy-MM-dd")',
+        photoPath: '@Model.PhotoPath'
+    };
+    
+    const dataStr = "data:text/json;charset=utf-8," + encodeURIComponent(JSON.stringify(staffData, null, 2));
+    const downloadAnchor = document.createElement('a');
+    downloadAnchor.href = dataStr;
+    downloadAnchor.download = `staff-${staffData.id}-${staffData.name.replace(/\s+/g, '-')}.json`;
+    document.body.appendChild(downloadAnchor);
+    downloadAnchor.click();
+    document.body.removeChild(downloadAnchor);
+}
+
+// Add some animations
+document.addEventListener('DOMContentLoaded', function() {
+    // Animate cards on load
+    const cards = document.querySelectorAll('.card');
+    cards.forEach((card, index) => {
+        card.style.opacity = '0';
+        card.style.transform = 'translateY(20px)';
+        setTimeout(() => {
+            card.style.transition = 'all 0.3s ease-in-out';
+            card.style.opacity = '1';
+            card.style.transform = 'translateY(0)';
+        }, index * 100);
+    });
+});
+</script>
+}

@@ -1,0 +1,75 @@
+@model LoginViewModel
+@{
+    ViewData["Title"] = "Login";
+    Layout = "~/Views/Shared/_Layout.cshtml";
+}
+
+<div class="container-fluid min-vh-100 d-flex align-items-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
+    <div class="container">
+        <div class="row justify-content-center">
+            <div class="col-md-6 col-lg-4">
+                <div class="card shadow-lg border-0" style="border-radius: 20px;">
+                    <div class="card-body p-5">
+                        <div class="text-center mb-4">
+                            <i class="bi bi-shield-lock-fill text-primary" style="font-size: 4rem;"></i>
+                            <h2 class="card-title mt-3 fw-bold">Staff Validator</h2>
+                            <p class="text-muted">Please sign in to your account</p>
+                        </div>
+
+                        <form asp-action="Login" asp-controller="Auth" method="post">
+                            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
+                            
+                            <div class="mb-3">
+                                <label asp-for="Username" class="form-label fw-medium">
+                                    <i class="bi bi-person-fill me-2"></i>Username
+                                </label>
+                                <input asp-for="Username" class="form-control form-control-lg" 
+                                       placeholder="Enter your username" autocomplete="username" />
+                                <span asp-validation-for="Username" class="text-danger small"></span>
+                            </div>
+
+                            <div class="mb-3">
+                                <label asp-for="Password" class="form-label fw-medium">
+                                    <i class="bi bi-lock-fill me-2"></i>Password
+                                </label>
+                                <input asp-for="Password" class="form-control form-control-lg" 
+                                       placeholder="Enter your password" autocomplete="current-password" />
+                                <span asp-validation-for="Password" class="text-danger small"></span>
+                            </div>
+
+                            <div class="form-check mb-4">
+                                <input asp-for="RememberMe" class="form-check-input" />
+                                <label asp-for="RememberMe" class="form-check-label text-muted">
+                                    Remember me
+                                </label>
+                            </div>
+
+                            <button type="submit" class="btn btn-primary btn-lg w-100 mb-3" 
+                                    style="background: linear-gradient(45deg, #667eea, #764ba2); border: none; border-radius: 10px;">
+                                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
+                            </button>
+                            
+                            <input type="hidden" asp-for="@ViewData["ReturnUrl"]" />
+                        </form>
+
+                        <div class="text-center mt-4">
+                            <a asp-action="ForgotPassword" class="text-muted text-decoration-none small">
+                                <i class="bi bi-question-circle me-1"></i>Forgot your password?
+                            </a>
+                        </div>
+
+                        <div class="text-center mt-3">
+                            <small class="text-muted">
+                                Contact your system administrator for access
+                            </small>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
+}

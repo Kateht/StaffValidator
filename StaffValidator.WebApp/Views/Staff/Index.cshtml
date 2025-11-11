@@ -1,0 +1,328 @@
+﻿@model IEnumerable<StaffValidator.Core.Models.Staff>
+@{
+    ViewData["Title"] = "Staff Management";
+}
+
+@* Anti-forgery token for delete operations *@
+@Html.AntiForgeryToken()
+
+@if (TempData["Success"] != null)
+{
+    <div class="alert alert-success alert-dismissible fade show" role="alert">
+        <i class="bi bi-check-circle me-2"></i>
+        @TempData["Success"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["Error"] != null)
+{
+    <div class="alert alert-danger alert-dismissible fade show" role="alert">
+        <i class="bi bi-exclamation-triangle me-2"></i>
+        @TempData["Error"]
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+@if (TempData["ValidationErrors"] != null)
+{
+    var errors = TempData["ValidationErrors"] as List<string>;
+    <div class="alert alert-warning alert-dismissible fade show" role="alert">
+        <h6><i class="bi bi-exclamation-triangle me-2"></i>Validation Errors from Upload:</h6>
+        <ul class="mb-0">
+            @foreach (var error in errors!)
+            {
+                <li>@error</li>
+            }
+        </ul>
+        <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+    </div>
+}
+
+<div class="d-flex justify-content-between align-items-center mb-4">
+    <div>
+        <h1 class="h3 mb-1">
+            <i class="bi bi-people-fill text-primary me-2"></i>Staff Management
+        </h1>
+        <p class="text-muted mb-0">Manage and validate staff records</p>
+    </div>
+    <div>
+        <div class="btn-group" role="group">
+            <a href="@Url.Action("Upload")" class="btn btn-outline-success">
+                <i class="bi bi-upload me-1"></i>Upload JSON
+            </a>
+            <a href="@Url.Action("Create")" class="btn btn-primary">
+                <i class="bi bi-person-plus me-1"></i>Add New Staff
+            </a>
+        </div>
+    </div>
+</div>
+
+<!-- Search and Filter Section -->
+<div class="card shadow-sm mb-4">
+    <div class="card-body">
+        <div class="row g-3">
+            <div class="col-md-6">
+                <div class="input-group">
+                    <span class="input-group-text"><i class="bi bi-search"></i></span>
+                    <input type="text" id="searchInput" class="form-control" placeholder="Search by name, email, or phone...">
+                </div>
+            </div>
+            <div class="col-md-3">
+                <select id="sortSelect" class="form-select">
+                    <option value="name">Sort by Name</option>
+                    <option value="date">Sort by Date</option>
+                    <option value="id">Sort by ID</option>
+                </select>
+            </div>
+            <div class="col-md-3">
+                <button type="button" class="btn btn-outline-secondary w-100" onclick="clearFilters()">
+                    <i class="bi bi-arrow-clockwise me-1"></i>Clear Filters
+                </button>
+            </div>
+        </div>
+    </div>
+</div>
+
+@if (!Model.Any())
+{
+    <div class="card shadow-sm">
+        <div class="card-body text-center py-5">
+            <i class="bi bi-inbox display-1 text-muted mb-3"></i>
+            <h4>No Staff Records Found</h4>
+            <p class="text-muted mb-4">Get started by adding your first staff member.</p>
+            <a href="@Url.Action("Create")" class="btn btn-primary">
+                <i class="bi bi-person-plus me-1"></i>Add First Staff Member
+            </a>
+        </div>
+    </div>
+}
+else
+{
+    <div class="card shadow-sm">
+        <div class="card-header bg-white">
+            <h5 class="mb-0">
+                <i class="bi bi-table me-2"></i>Staff Records 
+                <span class="badge bg-secondary ms-2" id="recordCount">@Model.Count()</span>
+            </h5>
+        </div>
+        <div class="card-body p-0">
+            <div class="table-responsive">
+                <table class="table table-hover mb-0" id="staffTable">
+                    <thead class="table-light">
+                        <tr>
+                            <th scope="col" class="ps-4">
+                                <i class="bi bi-hash text-muted me-1"></i>ID
+                            </th>
+                            <th scope="col">
+                                <i class="bi bi-person text-muted me-1"></i>Name
+                            </th>
+                            <th scope="col">
+                                <i class="bi bi-envelope text-muted me-1"></i>Email
+                            </th>
+                            <th scope="col">
+                                <i class="bi bi-telephone text-muted me-1"></i>Phone
+                            </th>
+                            <th scope="col">
+                                <i class="bi bi-calendar text-muted me-1"></i>Start Date
+                            </th>
+                            <th scope="col" class="text-center">
+                                <i class="bi bi-image text-muted me-1"></i>Photo
+                            </th>
+                            <th scope="col" class="text-center pe-4">Actions</th>
+                        </tr>
+                    </thead>
+                    <tbody>
+                    @foreach(var staff in Model)
+                    {
+                        <tr class="staff-row" data-name="@staff.StaffName.ToLower()" data-email="@staff.Email.ToLower()" data-phone="@staff.PhoneNumber" data-date="@staff.StartingDate.ToString("yyyy-MM-dd")" data-id="@staff.StaffID">
+                            <td class="ps-4">
+                                <span class="badge bg-light text-dark">#@staff.StaffID</span>
+                            </td>
+                            <td>
+                                <div class="fw-medium">@staff.StaffName</div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    @if (staff.Email.Contains("@") && staff.Email.Contains("."))
+                                    {
+                                        <i class="bi bi-check-circle text-success me-1" title="Valid email format"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-exclamation-triangle text-warning me-1" title="Invalid email format"></i>
+                                    }
+                                    <span>@staff.Email</span>
+                                </div>
+                            </td>
+                            <td>
+                                <div class="d-flex align-items-center">
+                                    @if (!string.IsNullOrWhiteSpace(staff.PhoneNumber) && staff.PhoneNumber.Length >= 10)
+                                    {
+                                        <i class="bi bi-check-circle text-success me-1" title="Valid phone format"></i>
+                                    }
+                                    else
+                                    {
+                                        <i class="bi bi-exclamation-triangle text-warning me-1" title="Check phone format"></i>
+                                    }
+                                    <span>@staff.PhoneNumber</span>
+                                </div>
+                            </td>
+                            <td>
+                                <span class="text-muted">@staff.StartingDate.ToString("MMM dd, yyyy")</span>
+                            </td>
+                            <td class="text-center">
+                                @if (!string.IsNullOrEmpty(staff.PhotoPath))
+                                {
+                                    <img src="@staff.PhotoPath" class="rounded-circle border" width="40" height="40" style="object-fit: cover;" alt="@staff.StaffName" />
+                                }
+                                else
+                                {
+                                    <div class="bg-light rounded-circle d-inline-flex align-items-center justify-content-center" style="width: 40px; height: 40px;">
+                                        <i class="bi bi-person text-muted"></i>
+                                    </div>
+                                }
+                            </td>
+                            <td class="text-center pe-4">
+                                <div class="btn-group" role="group">
+                                    <a href="@Url.Action("Details", new { id = staff.StaffID })" 
+                                       class="btn btn-outline-primary btn-sm" 
+                                       title="View Details">
+                                        <i class="bi bi-eye"></i>
+                                    </a>
+                                    <a href="@Url.Action("Edit", new { id = staff.StaffID })" 
+                                       class="btn btn-outline-secondary btn-sm" 
+                                       title="Edit">
+                                        <i class="bi bi-pencil"></i>
+                                    </a>
+                                    @if (User.IsInRole("Manager") || User.IsInRole("Administrator"))
+                                    {
+                                        <button type="button" 
+                                                class="btn btn-outline-danger btn-sm" 
+                                                title="Delete"
+                                                onclick="confirmDelete(@staff.StaffID, '@staff.StaffName')">
+                                            <i class="bi bi-trash"></i>
+                                        </button>
+                                    }
+                                </div>
+                            </td>
+                        </tr>
+                    }
+                    </tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+}
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const searchInput = document.getElementById('searchInput');
+    const sortSelect = document.getElementById('sortSelect');
+    const table = document.getElementById('staffTable');
+    const rows = table ? Array.from(table.querySelectorAll('.staff-row')) : [];
+    const recordCount = document.getElementById('recordCount');
+
+    function updateRecordCount() {
+        const visibleRows = rows.filter(row => row.style.display !== 'none');
+        if (recordCount) recordCount.textContent = visibleRows.length;
+    }
+
+    function filterRows() {
+        const searchTerm = searchInput.value.toLowerCase();
+        
+        rows.forEach(row => {
+            const name = row.dataset.name || '';
+            const email = row.dataset.email || '';
+            const phone = row.dataset.phone || '';
+            
+            const matches = name.includes(searchTerm) || 
+                           email.includes(searchTerm) || 
+                           phone.includes(searchTerm);
+            
+            row.style.display = matches ? '' : 'none';
+        });
+        
+        updateRecordCount();
+    }
+
+    function sortRows() {
+        const sortBy = sortSelect.value;
+        const tbody = table?.querySelector('tbody');
+        
+        if (!tbody) return;
+        
+        rows.sort((a, b) => {
+            let aValue, bValue;
+            
+            switch(sortBy) {
+                case 'name':
+                    aValue = a.dataset.name || '';
+                    bValue = b.dataset.name || '';
+                    break;
+                case 'date':
+                    aValue = a.dataset.date || '';
+                    bValue = b.dataset.date || '';
+                    break;
+                case 'id':
+                    aValue = parseInt(a.dataset.id) || 0;
+                    bValue = parseInt(b.dataset.id) || 0;
+                    break;
+                default:
+                    return 0;
+            }
+            
+            if (typeof aValue === 'string') {
+                return aValue.localeCompare(bValue);
+            }
+            return aValue - bValue;
+        });
+        
+        rows.forEach(row => tbody.appendChild(row));
+    }
+
+    window.clearFilters = function() {
+        searchInput.value = '';
+        sortSelect.value = 'name';
+        filterRows();
+        sortRows();
+    };
+
+    if (searchInput) {
+        searchInput.addEventListener('input', filterRows);
+    }
+    
+    if (sortSelect) {
+        sortSelect.addEventListener('change', sortRows);
+    }
+
+    // Delete confirmation function
+    window.confirmDelete = function(staffId, staffName) {
+        if (confirm(`Are you sure you want to delete staff member "${staffName}"? This action cannot be undone.`)) {
+            const form = document.createElement('form');
+            form.method = 'POST';
+            form.action = '@Url.Action("Delete")';
+            
+            const csrfToken = document.querySelector('input[name="__RequestVerificationToken"]');
+            if (csrfToken) {
+                const tokenInput = document.createElement('input');
+                tokenInput.type = 'hidden';
+                tokenInput.name = '__RequestVerificationToken';
+                tokenInput.value = csrfToken.value;
+                form.appendChild(tokenInput);
+            }
+            
+            const idInput = document.createElement('input');
+            idInput.type = 'hidden';
+            idInput.name = 'id';
+            idInput.value = staffId;
+            form.appendChild(idInput);
+            
+            document.body.appendChild(form);
+            form.submit();
+        }
+    };
+});
+</script>
+}

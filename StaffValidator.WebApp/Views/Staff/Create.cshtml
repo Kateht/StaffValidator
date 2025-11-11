@@ -1,0 +1,218 @@
+@model StaffValidator.Core.Models.Staff
+@{
+    ViewData["Title"] = "Add New Staff";
+}
+
+<div class="row justify-content-center">
+    <div class="col-lg-8">
+        <div class="card shadow-sm">
+            <div class="card-header bg-primary text-white">
+                <h4 class="mb-0">
+                    <i class="bi bi-person-plus me-2"></i>Add New Staff Member
+                </h4>
+            </div>
+            <div class="card-body">
+                <!-- Validation Summary -->
+                @if (!ViewData.ModelState.IsValid)
+                {
+                    <div class="alert alert-danger" role="alert">
+                        <h6 class="alert-heading">
+                            <i class="bi bi-exclamation-triangle me-2"></i>Please correct the following errors:
+                        </h6>
+                        <ul class="mb-0">
+                            @foreach (var modelState in ViewData.ModelState.Values)
+                            {
+                                foreach (var error in modelState.Errors)
+                                {
+                                    <li>@error.ErrorMessage</li>
+                                }
+                            }
+                        </ul>
+                    </div>
+                }
+
+                <form asp-action="Create" method="post" enctype="multipart/form-data" id="staffForm">
+                    <div class="row">
+                        <!-- Left Column -->
+                        <div class="col-md-8">
+                            <div class="mb-4">
+                                <label asp-for="StaffName" class="form-label fw-medium">
+                                    <i class="bi bi-person text-primary me-1"></i>Full Name *
+                                </label>
+                                <input asp-for="StaffName" class="form-control form-control-lg" placeholder="Enter full name" required />
+                                <span asp-validation-for="StaffName" class="text-danger"></span>
+                            </div>
+
+                            <div class="mb-4">
+                                <label asp-for="Email" class="form-label fw-medium">
+                                    <i class="bi bi-envelope text-primary me-1"></i>Email Address *
+                                </label>
+                                <input asp-for="Email" type="email" class="form-control" placeholder="example@company.com" required />
+                                <span asp-validation-for="Email" class="text-danger"></span>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>We'll validate the email format automatically
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label asp-for="PhoneNumber" class="form-label fw-medium">
+                                    <i class="bi bi-telephone text-primary me-1"></i>Phone Number *
+                                </label>
+                                <input asp-for="PhoneNumber" type="tel" class="form-control" placeholder="+1 (555) 123-4567" required />
+                                <span asp-validation-for="PhoneNumber" class="text-danger"></span>
+                                <div class="form-text">
+                                    <i class="bi bi-info-circle me-1"></i>Include country code for international numbers
+                                </div>
+                            </div>
+
+                            <div class="mb-4">
+                                <label asp-for="StartingDate" class="form-label fw-medium">
+                                    <i class="bi bi-calendar text-primary me-1"></i>Starting Date *
+                                </label>
+                                <input asp-for="StartingDate" type="date" class="form-control" required />
+                                <span asp-validation-for="StartingDate" class="text-danger"></span>
+                            </div>
+                        </div>
+
+                        <!-- Right Column - Photo Upload -->
+                        <div class="col-md-4">
+                            <div class="mb-4">
+                                <label class="form-label fw-medium">
+                                    <i class="bi bi-camera text-primary me-1"></i>Profile Photo
+                                </label>
+                                <div class="border rounded p-3 text-center bg-light" style="min-height: 200px;">
+                                    <div id="photoPreview" style="display: none;">
+                                        <img id="previewImage" src="" alt="Preview" class="img-fluid rounded mb-2" style="max-height: 150px;" />
+                                        <div>
+                                            <button type="button" class="btn btn-sm btn-outline-danger" onclick="removePhoto()">
+                                                <i class="bi bi-trash"></i> Remove
+                                            </button>
+                                        </div>
+                                    </div>
+                                    <div id="photoPlaceholder">
+                                        <i class="bi bi-cloud-upload display-4 text-muted mb-2"></i>
+                                        <p class="text-muted mb-2">Click to upload photo</p>
+                                        <small class="text-muted">JPG, PNG, GIF up to 5MB</small>
+                                    </div>
+                                    <input type="file" name="photo" class="form-control" accept="image/*" id="photoInput" style="display: none;" />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- Form Actions -->
+                    <div class="border-top pt-4">
+                        <div class="d-flex gap-2">
+                            <button type="submit" class="btn btn-primary btn-lg">
+                                <i class="bi bi-check-lg me-1"></i>Create Staff Member
+                            </button>
+                            <a href="@Url.Action("Index")" class="btn btn-outline-secondary btn-lg">
+                                <i class="bi bi-arrow-left me-1"></i>Cancel
+                            </a>
+                        </div>
+                    </div>
+                </form>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+<script>
+document.addEventListener('DOMContentLoaded', function() {
+    const photoInput = document.getElementById('photoInput');
+    const photoPreview = document.getElementById('photoPreview');
+    const photoPlaceholder = document.getElementById('photoPlaceholder');
+    const previewImage = document.getElementById('previewImage');
+
+    // Make the entire photo area clickable
+    document.querySelector('.bg-light').addEventListener('click', function(e) {
+        if (e.target !== photoInput && !e.target.closest('button')) {
+            photoInput.click();
+        }
+    });
+
+    // Handle file selection
+    photoInput.addEventListener('change', function(e) {
+        const file = e.target.files[0];
+        if (file) {
+            // Validate file size (5MB)
+            if (file.size > 5 * 1024 * 1024) {
+                alert('File size must be less than 5MB');
+                e.target.value = '';
+                return;
+            }
+
+            // Preview the image
+            const reader = new FileReader();
+            reader.onload = function(e) {
+                previewImage.src = e.target.result;
+                photoPlaceholder.style.display = 'none';
+                photoPreview.style.display = 'block';
+            };
+            reader.readAsDataURL(file);
+        }
+    });
+
+    // Remove photo function
+    window.removePhoto = function() {
+        photoInput.value = '';
+        photoPlaceholder.style.display = 'block';
+        photoPreview.style.display = 'none';
+        previewImage.src = '';
+    };
+
+    // Form validation
+    const form = document.getElementById('staffForm');
+    form.addEventListener('submit', function(e) {
+        const requiredFields = form.querySelectorAll('input[required]');
+        let isValid = true;
+
+        requiredFields.forEach(field => {
+            field.classList.remove('is-invalid');
+            if (!field.value.trim()) {
+                field.classList.add('is-invalid');
+                isValid = false;
+            }
+        });
+
+        // Email validation
+        const emailField = document.querySelector('input[type="email"]');
+        if (emailField.value && !emailField.value.match(/^[^\s@@]+@@[^\s@@]+\.[^\s@@]+$/)) {
+            emailField.classList.add('is-invalid');
+            isValid = false;
+        }
+
+        if (!isValid) {
+            e.preventDefault();
+            window.scrollTo({ top: 0, behavior: 'smooth' });
+        }
+    });
+
+    // Real-time validation feedback
+    document.querySelectorAll('input').forEach(input => {
+        input.addEventListener('blur', function() {
+            if (this.hasAttribute('required') && !this.value.trim()) {
+                this.classList.add('is-invalid');
+            } else {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            }
+        });
+
+        input.addEventListener('input', function() {
+            if (this.classList.contains('is-invalid') && this.value.trim()) {
+                this.classList.remove('is-invalid');
+                this.classList.add('is-valid');
+            }
+        });
+    });
+
+    // Set default date to today
+    const startDateInput = document.querySelector('input[type="date"]');
+    if (startDateInput && !startDateInput.value) {
+        startDateInput.value = new Date().toISOString().split('T')[0];
+    }
+});
+</script>
+}

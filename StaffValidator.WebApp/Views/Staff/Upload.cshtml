@@ -1,0 +1,193 @@
+@{
+    ViewData["Title"] = "Upload Staff Data";
+}
+
+<div class="container mt-4">
+    <div class="row justify-content-center">
+        <div class="col-lg-8">
+            <div class="card shadow">
+                <div class="card-header bg-primary text-white">
+                    <h2 class="mb-0">
+                        <i class="fas fa-upload me-2"></i>
+                        Upload Staff Data from JSON
+                    </h2>
+                </div>
+                <div class="card-body">
+                    @if (TempData["Error"] != null)
+                    {
+                        <div class="alert alert-danger alert-dismissible fade show" role="alert">
+                            <i class="fas fa-exclamation-triangle me-2"></i>
+                            @TempData["Error"]
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+
+                    @if (TempData["ValidationErrors"] != null)
+                    {
+                        var errors = TempData["ValidationErrors"] as List<string>;
+                        <div class="alert alert-warning alert-dismissible fade show" role="alert">
+                            <h6><i class="fas fa-exclamation-triangle me-2"></i>Validation Errors:</h6>
+                            <ul class="mb-0">
+                                @foreach (var error in errors!)
+                                {
+                                    <li>@error</li>
+                                }
+                            </ul>
+                            <button type="button" class="btn-close" data-bs-dismiss="alert"></button>
+                        </div>
+                    }
+
+                    <form asp-action="Upload" method="post" enctype="multipart/form-data" class="needs-validation" novalidate>
+                        <div class="mb-4">
+                            <label for="jsonFile" class="form-label fw-bold">
+                                <i class="fas fa-file-code me-2"></i>
+                                Select JSON File
+                            </label>
+                            <input type="file" 
+                                   class="form-control form-control-lg" 
+                                   id="jsonFile" 
+                                   name="jsonFile" 
+                                   accept=".json"
+                                   required>
+                            <div class="form-text">
+                                <i class="fas fa-info-circle me-1"></i>
+                                Select a JSON file containing staff data. Maximum file size: 10MB.
+                            </div>
+                            <div class="invalid-feedback">
+                                Please select a valid JSON file.
+                            </div>
+                        </div>
+
+                        <div class="alert alert-info">
+                            <h6><i class="fas fa-lightbulb me-2"></i>JSON Format Example:</h6>
+                            <pre><code>[
+  {
+    "staffName": "John Doe",
+    "email": "john.doe@company.com",
+    "phoneNumber": "+1-555-0123",
+    "startingDate": "2024-01-15T00:00:00"
+  },
+  {
+    "staffName": "Jane Smith",
+    "email": "jane.smith@company.com",
+    "phoneNumber": "+1-555-0124",
+    "startingDate": "2024-02-01T00:00:00"
+  }
+]</code></pre>
+                        </div>
+
+                        <div class="alert alert-warning">
+                            <h6><i class="fas fa-exclamation-circle me-2"></i>Important Notes:</h6>
+                            <ul class="mb-0">
+                                <li>Staff members with existing email addresses will be <strong>updated</strong></li>
+                                <li>New staff members will be <strong>added</strong> to the system</li>
+                                <li>All data will be validated before processing</li>
+                                <li>Invalid records will be skipped with error details</li>
+                                <li>Photos are not supported in JSON upload (use manual entry for photos)</li>
+                            </ul>
+                        </div>
+
+                        <div class="d-grid gap-2 d-md-flex justify-content-md-end">
+                            <a asp-action="Index" class="btn btn-outline-secondary me-2">
+                                <i class="fas fa-arrow-left me-2"></i>
+                                Back to Staff List
+                            </a>
+                            <button type="submit" class="btn btn-primary">
+                                <i class="fas fa-upload me-2"></i>
+                                Upload & Process
+                            </button>
+                        </div>
+                    </form>
+                </div>
+            </div>
+
+            <!-- Sample JSON Download -->
+            <div class="card mt-4">
+                <div class="card-body">
+                    <h5 class="card-title">
+                        <i class="fas fa-download me-2"></i>
+                        Download Sample JSON Template
+                    </h5>
+                    <p class="card-text">
+                        Download a sample JSON file to use as a template for your staff data upload.
+                    </p>
+                    <button type="button" class="btn btn-outline-info" onclick="downloadSampleJSON()">
+                        <i class="fas fa-download me-2"></i>
+                        Download Sample JSON
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+
+@section Scripts {
+    <script>
+        // Form validation
+        (function() {
+            'use strict';
+            window.addEventListener('load', function() {
+                var forms = document.getElementsByClassName('needs-validation');
+                var validation = Array.prototype.filter.call(forms, function(form) {
+                    form.addEventListener('submit', function(event) {
+                        if (form.checkValidity() === false) {
+                            event.preventDefault();
+                            event.stopPropagation();
+                        }
+                        form.classList.add('was-validated');
+                    }, false);
+                });
+            }, false);
+        })();
+
+        // File validation
+        document.getElementById('jsonFile').addEventListener('change', function(e) {
+            const file = e.target.files[0];
+            if (file) {
+                if (!file.name.toLowerCase().endsWith('.json')) {
+                    e.target.setCustomValidity('Please select a JSON file');
+                } else if (file.size > 10 * 1024 * 1024) {
+                    e.target.setCustomValidity('File size must be less than 10MB');
+                } else {
+                    e.target.setCustomValidity('');
+                }
+            }
+        });
+
+        // Download sample JSON
+        function downloadSampleJSON() {
+            const sampleData = [
+                {
+                    "staffName": "John Doe",
+                    "email": "john.doe@company.com", 
+                    "phoneNumber": "+1-555-0123",
+                    "startingDate": "2024-01-15T00:00:00"
+                },
+                {
+                    "staffName": "Jane Smith",
+                    "email": "jane.smith@company.com",
+                    "phoneNumber": "+1-555-0124", 
+                    "startingDate": "2024-02-01T00:00:00"
+                },
+                {
+                    "staffName": "Alice Johnson",
+                    "email": "alice.johnson@company.com",
+                    "phoneNumber": "+1-555-0125",
+                    "startingDate": "2024-03-01T00:00:00"
+                }
+            ];
+            
+            const jsonString = JSON.stringify(sampleData, null, 2);
+            const blob = new Blob([jsonString], { type: 'application/json' });
+            const url = URL.createObjectURL(blob);
+            
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = 'staff_sample.json';
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        }
+    </script>
+}
