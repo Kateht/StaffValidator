@@ -34,3 +34,7 @@ StaffValidator.WebApp/wwwroot/uploads/
 TestResults/
 coverage.opencover.xml
 coverage.*.xml
+ 
+# Local data and local development settings (don't commit PII or secrets)
+data/
+appsettings.Development.json
