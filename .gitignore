@@ -1,0 +1,36 @@
+# Build
+bin/
+obj/
+
+# Visual Studio
+.vs/
+*.user
+*.suo
+
+# Rider
+.idea/
+*.sln.iml
+
+# OS
+.DS_Store
+Thumbs.db
+
+# dotnet watch
+dotnet-watch.json
+
+# user-specific files
+*.userprefs
+
+# uploads and temp
+StaffValidator.WebApp/wwwroot/uploads/
+
+# logs
+*.log
+
+# NuGet
+*.nupkg
+
+# Test results
+TestResults/
+coverage.opencover.xml
+coverage.*.xml
