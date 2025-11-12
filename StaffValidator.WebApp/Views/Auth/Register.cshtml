@@ -1,89 +1,36 @@
 @model RegisterViewModel
 @{
     ViewData["Title"] = "Register";
-    Layout = "~/Views/Shared/_Layout.cshtml";
+    ViewData["AuthTitle"] = "Create Account";
+    ViewData["AuthSubtitle"] = "Join Staff Validator";
+    Layout = "~/Views/Shared/_AuthCard.cshtml";
 }
-
-<div class="container-fluid min-vh-100 d-flex align-items-center" style="background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);">
-    <div class="container">
-        <div class="row justify-content-center">
-            <div class="col-md-6 col-lg-5">
-                <div class="card shadow-lg border-0" style="border-radius: 20px;">
-                    <div class="card-body p-5">
-                        <div class="text-center mb-4">
-                            <i class="bi bi-person-plus-fill text-success" style="font-size: 4rem;"></i>
-                            <h2 class="card-title mt-3 fw-bold">Create Account</h2>
-                            <p class="text-muted">Join Staff Validator today</p>
-                        </div>
-
-                        <form asp-action="Register" asp-controller="Auth" method="post">
-                            <div asp-validation-summary="ModelOnly" class="text-danger mb-3"></div>
-                            
-                            <div class="mb-3">
-                                <label asp-for="Username" class="form-label fw-medium">
-                                    <i class="bi bi-person me-2"></i>Username
-                                </label>
-                                <input asp-for="Username" class="form-control form-control-lg" 
-                                       placeholder="Choose a username" autocomplete="username" />
-                                <span asp-validation-for="Username" class="text-danger small"></span>
-                            </div>
-
-                            <div class="mb-3">
-                                <label asp-for="Email" class="form-label fw-medium">
-                                    <i class="bi bi-envelope me-2"></i>Email Address
-                                </label>
-                                <input asp-for="Email" class="form-control form-control-lg" 
-                                       placeholder="Enter your email" autocomplete="email" />
-                                <span asp-validation-for="Email" class="text-danger small"></span>
-                            </div>
-
-                            <div class="mb-3">
-                                <label asp-for="Password" class="form-label fw-medium">
-                                    <i class="bi bi-lock me-2"></i>Password
-                                </label>
-                                <input asp-for="Password" class="form-control form-control-lg" 
-                                       placeholder="Create a password" autocomplete="new-password" />
-                                <span asp-validation-for="Password" class="text-danger small"></span>
-                            </div>
-
-                            <div class="mb-4">
-                                <label asp-for="ConfirmPassword" class="form-label fw-medium">
-                                    <i class="bi bi-lock-fill me-2"></i>Confirm Password
-                                </label>
-                                <input asp-for="ConfirmPassword" class="form-control form-control-lg" 
-                                       placeholder="Confirm your password" autocomplete="new-password" />
-                                <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
-                            </div>
-
-                            <button type="submit" class="btn btn-success btn-lg w-100 mb-3" 
-                                    style="background: linear-gradient(45deg, #28a745, #20c997); border: none; border-radius: 10px;">
-                                <i class="bi bi-check-circle me-2"></i>Create Account
-                            </button>
-                        </form>
-
-                        <hr class="my-4">
-                        
-                        <div class="text-center">
-                            <p class="text-muted mb-2">Already have an account?</p>
-                            <a asp-action="Login" asp-controller="Auth" class="btn btn-outline-primary btn-lg w-100"
-                               style="border-radius: 10px;">
-                                <i class="bi bi-box-arrow-in-right me-2"></i>Sign In
-                            </a>
-                        </div>
-
-                        <div class="mt-4 p-3 bg-light rounded">
-                            <small class="text-muted d-block">
-                                <i class="bi bi-info-circle me-1"></i>
-                                By creating an account, you'll have access to the Staff Validator system with User role permissions.
-                            </small>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        </div>
+<form asp-action="Register" asp-controller="Auth" method="post" class="auth-form">
+    <div asp-validation-summary="ModelOnly" class="text-danger small mb-3"></div>
+    <div class="mb-3">
+        <label asp-for="Username" class="form-label small fw-semibold text-uppercase"></label>
+        <input asp-for="Username" class="form-control" placeholder="username" autocomplete="username" />
+        <span asp-validation-for="Username" class="text-danger small"></span>
     </div>
-</div>
-
-@section Scripts {
-    @{await Html.RenderPartialAsync("_ValidationScriptsPartial");}
-}
+    <div class="mb-3">
+        <label asp-for="Email" class="form-label small fw-semibold text-uppercase"></label>
+        <input asp-for="Email" class="form-control" placeholder="email@example.com" autocomplete="email" />
+        <span asp-validation-for="Email" class="text-danger small"></span>
+    </div>
+    <div class="mb-3">
+        <label asp-for="Password" class="form-label small fw-semibold text-uppercase"></label>
+        <input asp-for="Password" class="form-control" autocomplete="new-password" placeholder="New strong password" />
+        <span asp-validation-for="Password" class="text-danger small"></span>
+        <small class="text-muted">At least 6 chars, 1 uppercase, 1 number</small>
+    </div>
+    <div class="mb-4">
+        <label asp-for="ConfirmPassword" class="form-label small fw-semibold text-uppercase"></label>
+        <input asp-for="ConfirmPassword" class="form-control" autocomplete="new-password" placeholder="Confirm password" />
+        <span asp-validation-for="ConfirmPassword" class="text-danger small"></span>
+    </div>
+    <button type="submit" class="btn btn-primary w-100 mb-2">Create Account</button>
+    <div class="text-center small">
+        <a asp-action="Login" class="text-decoration-none">Already have an account? Login</a>
+    </div>
+</form>
+@section Scripts { <partial name="_ValidationScriptsPartial" /> }

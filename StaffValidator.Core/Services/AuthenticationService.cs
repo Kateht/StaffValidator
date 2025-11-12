@@ -11,6 +11,9 @@ public interface IAuthenticationService
 {
     Task<AuthenticationResult> AuthenticateAsync(string username, string password);
     Task<AuthenticationResult> RegisterAsync(string username, string email, string password, string role = "User");
+    Task<(bool Success, string? ResetToken, string? ErrorMessage)> RequestPasswordResetAsync(string usernameOrEmail);
+    Task<AuthenticationResult> ResetPasswordAsync(string token, string newPassword);
+    bool IsStrongPassword(string password);
 }
 
 public record AuthenticationResult(bool Success, string? Token = null, string? ErrorMessage = null);
@@ -21,6 +24,7 @@ public class AuthenticationService : IAuthenticationService
 {
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthenticationService> _logger;
+    private readonly bool _requireITForPrivilegedReset;
     
     // Simple in-memory store for demo purposes (in production, use proper user management)
     private static readonly List<AppUser> Users = new()
@@ -34,6 +38,8 @@ public class AuthenticationService : IAuthenticationService
     {
         _configuration = configuration;
         _logger = logger;
+        var flag = _configuration["Security:RequireITForPrivilegedReset"];
+        _requireITForPrivilegedReset = string.IsNullOrWhiteSpace(flag) ? true : bool.TryParse(flag, out var b) ? b : true;
     }
 
     public Task<AuthenticationResult> AuthenticateAsync(string username, string password)
@@ -100,6 +106,103 @@ public class AuthenticationService : IAuthenticationService
             _logger.LogError(ex, "💥 Registration error for user: {Username}", username);
             return Task.FromResult(new AuthenticationResult(false, ErrorMessage: "Registration failed"));
         }
+    }
+
+    // Simple in-memory reset token store for demo
+    private static readonly Dictionary<string, (string Username, DateTime Expires)> ResetTokens = new();
+    private static readonly TimeSpan ResetTokenLifetime = TimeSpan.FromMinutes(15);
+
+    public Task<(bool Success, string? ResetToken, string? ErrorMessage)> RequestPasswordResetAsync(string usernameOrEmail)
+    {
+        try
+        {
+            var user = Users.FirstOrDefault(u =>
+                u.Username.Equals(usernameOrEmail, StringComparison.OrdinalIgnoreCase) ||
+                u.Email.Equals(usernameOrEmail, StringComparison.OrdinalIgnoreCase));
+
+            if (user == null)
+            {
+                return Task.FromResult((false, (string?)null, "Account doesn't exist"));
+            }
+
+            // Non-enumeration for privileged roles (Admin/Manager)
+            if (_requireITForPrivilegedReset &&
+                (user.Role.Equals("Administrator", StringComparison.OrdinalIgnoreCase) ||
+                 user.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase)))
+            {
+                _logger.LogInformation("Silently suppressing reset token for privileged account: {Username}", user.Username);
+                // Return success with no token
+                return Task.FromResult((true, (string?)null, (string?)null));
+            }
+
+            // Generate token (guid for demo)
+            var token = Guid.NewGuid().ToString("N");
+            ResetTokens[token] = (user.Username, DateTime.UtcNow.Add(ResetTokenLifetime));
+            _logger.LogInformation("🔑 Issued reset token for {Username}", user.Username);
+            return Task.FromResult((true, token, (string?)null));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "💥 Error issuing reset token for {User}", usernameOrEmail);
+            return Task.FromResult((false, (string?)null, "Failed to issue reset token"));
+        }
+    }
+
+    public Task<AuthenticationResult> ResetPasswordAsync(string token, string newPassword)
+    {
+        try
+        {
+            if (!ResetTokens.TryGetValue(token, out var entry))
+            {
+                return Task.FromResult(new AuthenticationResult(false, ErrorMessage: "Invalid or expired token"));
+            }
+            if (entry.Expires < DateTime.UtcNow)
+            {
+                ResetTokens.Remove(token);
+                return Task.FromResult(new AuthenticationResult(false, ErrorMessage: "Invalid or expired token"));
+            }
+
+            var user = Users.FirstOrDefault(u => u.Username.Equals(entry.Username, StringComparison.OrdinalIgnoreCase));
+            if (user == null)
+            {
+                return Task.FromResult(new AuthenticationResult(false, ErrorMessage: "Invalid or expired token"));
+            }
+
+            if (!IsStrongPassword(newPassword))
+            {
+                return Task.FromResult(new AuthenticationResult(false, ErrorMessage: "Password too weak"));
+            }
+
+            // Block resets for privileged accounts when configured
+            if (_requireITForPrivilegedReset &&
+                (user.Role.Equals("Administrator", StringComparison.OrdinalIgnoreCase) ||
+                 user.Role.Equals("Manager", StringComparison.OrdinalIgnoreCase)))
+            {
+                _logger.LogWarning("Rejecting reset attempt for privileged account: {Username}", user.Username);
+                return Task.FromResult(new AuthenticationResult(false, ErrorMessage: "Invalid or expired token"));
+            }
+
+            user = new AppUser(user.Username, user.Email, BCrypt.Net.BCrypt.HashPassword(newPassword), user.Role);
+            // Replace user password (simple list update)
+            var idx = Users.FindIndex(u => u.Username == user.Username);
+            if (idx >= 0) Users[idx] = user;
+            ResetTokens.Remove(token);
+            _logger.LogInformation("🔄 Password reset successful for {Username}", user.Username);
+            return Task.FromResult(new AuthenticationResult(true));
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, "💥 Error resetting password with token {Token}", token);
+            return Task.FromResult(new AuthenticationResult(false, ErrorMessage: "Reset failed"));
+        }
+    }
+
+    public bool IsStrongPassword(string password)
+    {
+        if (string.IsNullOrWhiteSpace(password) || password.Length < 6) return false;
+        if (!password.Any(char.IsUpper)) return false;
+        if (!password.Any(char.IsDigit)) return false;
+        return true;
     }
 
     private string GenerateJwtToken(AppUser user)

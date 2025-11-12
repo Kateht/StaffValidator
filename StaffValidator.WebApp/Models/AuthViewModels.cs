@@ -47,3 +47,28 @@ public class ProfileViewModel
     public string Email { get; set; } = string.Empty;
     public string Role { get; set; } = string.Empty;
 }
+
+public class ForgotPasswordViewModel
+{
+    [Required(ErrorMessage = "Username or email is required")]
+    [Display(Name = "Username or Email")]
+    public string UsernameOrEmail { get; set; } = string.Empty;
+}
+
+public class ResetPasswordViewModel
+{
+    [Required(ErrorMessage = "Reset token is required")]
+    [Display(Name = "Reset token")]
+    public string Token { get; set; } = string.Empty;
+
+    [Required(ErrorMessage = "New password is required")]
+    [StringLength(100, MinimumLength = 6, ErrorMessage = "Password must be at least 6 characters")]
+    [DataType(DataType.Password)]
+    [Display(Name = "New password")]
+    public string NewPassword { get; set; } = string.Empty;
+
+    [DataType(DataType.Password)]
+    [Display(Name = "Confirm new password")]
+    [Compare("NewPassword", ErrorMessage = "The password and confirmation password do not match")]
+    public string ConfirmPassword { get; set; } = string.Empty;
+}

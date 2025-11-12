@@ -1,4 +1,6 @@
 using Microsoft.Extensions.Options;
+using Microsoft.AspNetCore.RateLimiting;
+using System.Threading.RateLimiting;
 using StaffValidator.Core.Repositories;
 using StaffValidator.Core.Services;
 using Serilog;
@@ -95,6 +97,20 @@ try
     builder.Services.AddSingleton<ValidatorService, HybridValidatorService>();
     builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
+    // Rate limiter: partition by client IP, 5 requests/min for auth policy
+    builder.Services.AddRateLimiter(options =>
+    {
+        options.AddPolicy("auth", httpContext =>
+            RateLimitPartition.GetFixedWindowLimiter(
+                partitionKey: httpContext.Connection.RemoteIpAddress?.ToString() ?? "unknown",
+                factory: _ => new FixedWindowRateLimiterOptions
+                {
+                    AutoReplenishment = true,
+                    PermitLimit = 5,
+                    Window = TimeSpan.FromMinutes(1)
+                }));
+    });
+
     // Configure JWT Authentication
     var jwtSettings = builder.Configuration.GetSection("JwtSettings");
     var secretKey = jwtSettings["SecretKey"] ?? "StaffValidator-Super-Secret-Key-For-JWT-Tokens-2024!";
@@ -182,6 +198,14 @@ try
     // Add authentication and authorization middleware
     app.UseAuthentication();
     app.UseAuthorization();
+    app.UseRateLimiter();
+
+    // Friendly redirect for accidental browser GET to API login endpoint
+    app.MapGet("/api/auth/login", (HttpContext ctx) =>
+    {
+        ctx.Response.Redirect("/Auth/Login");
+        return Results.Empty;
+    }).AllowAnonymous();
     
     app.MapControllerRoute(
         name: "default",

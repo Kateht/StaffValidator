@@ -17,9 +17,19 @@ public class AuthController : Controller
     }
 
     [HttpGet]
-    public IActionResult Login(string? returnUrl = null)
+    public IActionResult Login(string? returnUrl = null, string? error = null)
     {
         ViewData["ReturnUrl"] = returnUrl;
+        if (!string.IsNullOrEmpty(error))
+        {
+            // Map known error codes from API/browser redirects to user-friendly messages
+            var message = error.ToLowerInvariant() switch
+            {
+                "invalid" => "Invalid username or password.",
+                _ => "Authentication error. Please try again."
+            };
+            TempData["Error"] = message;
+        }
         return View(new LoginViewModel());
     }
 
@@ -72,30 +82,129 @@ public class AuthController : Controller
         return View(model);
     }
 
+    private bool RegistrationEnabled => string.IsNullOrWhiteSpace(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Security:EnableSelfRegistration"]) 
+        ? true 
+        : bool.TryParse(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Security:EnableSelfRegistration"], out var b) ? b : true;
+
     [HttpGet]
     public IActionResult Register()
     {
-        // Registration disabled in enterprise environment
-        _logger.LogWarning("� Registration attempt blocked - feature disabled");
-        TempData["Error"] = "Registration is disabled. Please contact your system administrator for account access.";
-        return RedirectToAction("Login");
+        if (!RegistrationEnabled)
+        {
+            TempData["Error"] = "Registration is disabled. Please contact your system administrator for access.";
+            return RedirectToAction("Login");
+        }
+        return View(new RegisterViewModel());
     }
 
     [HttpPost]
     [ValidateAntiForgeryToken]
-    public IActionResult Register(RegisterViewModel model)
+    public async Task<IActionResult> Register(RegisterViewModel model)
     {
-        // Registration disabled in enterprise environment
-        _logger.LogWarning("🚫 Registration POST attempt blocked - feature disabled");
-        TempData["Error"] = "Registration is disabled. Please contact your system administrator for account access.";
+        if (!RegistrationEnabled)
+        {
+            TempData["Error"] = "Registration is disabled.";
+            return RedirectToAction("Login");
+        }
+
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        if (!_authService.IsStrongPassword(model.Password))
+        {
+            ModelState.AddModelError(nameof(model.Password), "Password too weak (need uppercase + digit)" );
+            return View(model);
+        }
+
+        var result = await _authService.RegisterAsync(model.Username, model.Email, model.Password);
+        if (!result.Success)
+        {
+            ModelState.AddModelError(string.Empty, result.ErrorMessage ?? "Registration failed");
+            return View(model);
+        }
+
+        // Auto-login after successful registration for convenience
+        if (!string.IsNullOrEmpty(result.Token))
+        {
+            Response.Cookies.Append("AuthToken", result.Token, new CookieOptions
+            {
+                HttpOnly = true,
+                Secure = Request.IsHttps,
+                SameSite = SameSiteMode.Strict,
+                Expires = DateTimeOffset.UtcNow.AddHours(1)
+            });
+        }
+
+        TempData["Success"] = "Account created successfully";
         return RedirectToAction("Login");
     }
 
     [HttpGet]
     public IActionResult ForgotPassword()
     {
-        _logger.LogInformation("📋 Displaying forgot password information page");
-        return View();
+        _logger.LogInformation("📋 Displaying forgot password page");
+        return View(new ForgotPasswordViewModel());
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ForgotPassword(ForgotPasswordViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        var (success, resetToken, error) = await _authService.RequestPasswordResetAsync(model.UsernameOrEmail);
+        if (!success)
+        {
+            TempData["Error"] = "Account doesn't exist"; // unified message
+            return View(model);
+        }
+
+        if (!string.IsNullOrEmpty(resetToken))
+        {
+            TempData["Success"] = $"Reset token issued: {resetToken}"; // only in non-privileged case
+            return RedirectToAction("ResetPassword", new { token = resetToken });
+        }
+
+    // Privileged or suppressed issuance: show generic error to the user (red)
+    TempData["Error"] = "Account doesn't exist";
+    return View(model);
+    }
+
+    [HttpGet]
+    public IActionResult ResetPassword(string? token = null)
+    {
+        return View(new ResetPasswordViewModel { Token = token ?? string.Empty });
+    }
+
+    [HttpPost]
+    [ValidateAntiForgeryToken]
+    public async Task<IActionResult> ResetPassword(ResetPasswordViewModel model)
+    {
+        if (!ModelState.IsValid)
+        {
+            return View(model);
+        }
+
+        if (!_authService.IsStrongPassword(model.NewPassword))
+        {
+            ModelState.AddModelError(nameof(model.NewPassword), "Password too weak");
+            return View(model);
+        }
+
+        var result = await _authService.ResetPasswordAsync(model.Token, model.NewPassword);
+        if (!result.Success)
+        {
+            ModelState.AddModelError(string.Empty, "Invalid token");
+            return View(model);
+        }
+
+        TempData["Success"] = "Password reset successful";
+        return RedirectToAction("Login");
     }
 
     [HttpPost]

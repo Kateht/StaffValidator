@@ -58,6 +58,12 @@ public class AuthController : ControllerBase
             var result = await _auth.AuthenticateAsync(username, password);
             if (!result.Success)
             {
+                // If this is a browser flow (HTML accept or form), redirect back to MVC login with an error message
+                var accept = Request.Headers["Accept"].ToString();
+                if (Request.HasFormContentType || (!string.IsNullOrEmpty(accept) && accept.Contains("text/html", StringComparison.OrdinalIgnoreCase)))
+                {
+                    return Redirect("/Auth/Login?error=invalid");
+                }
                 return Unauthorized(new { success = false, error = result.ErrorMessage });
             }
 
@@ -76,8 +82,8 @@ public class AuthController : ControllerBase
             }
 
             // If the client expects HTML (form submit in browser) or submitted form data, redirect to home
-            var accept = Request.Headers["Accept"].ToString();
-            if (Request.HasFormContentType || (!string.IsNullOrEmpty(accept) && accept.Contains("text/html", StringComparison.OrdinalIgnoreCase)))
+            var acceptHeader = Request.Headers["Accept"].ToString();
+            if (Request.HasFormContentType || (!string.IsNullOrEmpty(acceptHeader) && acceptHeader.Contains("text/html", StringComparison.OrdinalIgnoreCase)))
             {
                 return Redirect("/");
             }
