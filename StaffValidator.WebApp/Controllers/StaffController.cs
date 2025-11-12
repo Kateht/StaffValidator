@@ -39,7 +39,7 @@ namespace StaffValidator.WebApp.Controllers
         [HttpPost]
         public IActionResult Create(Staff model, IFormFile? photo)
         {
-            _logger.LogInformation("➕ Attempting to create new staff: {StaffName} - {Email}", 
+            _logger.LogInformation("➕ Attempting to create new staff: {StaffName} - {Email}",
                 model.StaffName, model.Email);
 
             if (!ModelState.IsValid)
@@ -53,16 +53,16 @@ namespace StaffValidator.WebApp.Controllers
             {
                 if (photo != null && photo.Length > 0)
                 {
-                    _logger.LogInformation("📸 Processing photo upload: {FileName} ({Size} bytes)", 
+                    _logger.LogInformation("📸 Processing photo upload: {FileName} ({Size} bytes)",
                         photo.FileName, photo.Length);
 
-                    // Validate file type and size
+                    // Check image format/size
                     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
                     var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
-                    
+
                     if (!allowedExtensions.Contains(extension))
                     {
-                        _logger.LogWarning("🚫 Invalid file type attempted: {Extension} for staff: {StaffName}", 
+                        _logger.LogWarning("🚫 Invalid file type attempted: {Extension} for staff: {StaffName}",
                             extension, model.StaffName);
                         ModelState.AddModelError("photo", "Only JPG, PNG, and GIF files are allowed.");
                         TempData["Error"] = "Invalid file type. Please upload a valid image file.";
@@ -71,7 +71,7 @@ namespace StaffValidator.WebApp.Controllers
 
                     if (photo.Length > 5 * 1024 * 1024) // 5MB limit
                     {
-                        _logger.LogWarning("📏 File too large: {Size} bytes for staff: {StaffName}", 
+                        _logger.LogWarning("📏 File too large: {Size} bytes for staff: {StaffName}",
                             photo.Length, model.StaffName);
                         ModelState.AddModelError("photo", "File size cannot exceed 5MB.");
                         TempData["Error"] = "File is too large. Please upload an image smaller than 5MB.";
@@ -84,12 +84,12 @@ namespace StaffValidator.WebApp.Controllers
                     using var fs = new FileStream(Path.Combine(path, fname), FileMode.Create);
                     photo.CopyTo(fs);
                     model.PhotoPath = $"/uploads/{fname}";
-                    
+
                     _logger.LogInformation("✅ Photo uploaded successfully: {PhotoPath}", model.PhotoPath);
                 }
 
                 _repo.Add(model);
-                _logger.LogInformation("✅ Staff member created successfully: {StaffName} (ID: {StaffID})", 
+                _logger.LogInformation("✅ Staff member created successfully: {StaffName} (ID: {StaffID})",
                     model.StaffName, model.StaffID);
                 TempData["Success"] = $"Staff member '{model.StaffName}' has been successfully added!";
                 return RedirectToAction("Index");
@@ -151,10 +151,10 @@ namespace StaffValidator.WebApp.Controllers
                 // Handle photo upload
                 if (photo != null && photo.Length > 0)
                 {
-                    // Validate file type and size (same as Create)
+                    // Check image (same as Create)
                     var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
                     var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
-                    
+
                     if (!allowedExtensions.Contains(extension))
                     {
                         ModelState.AddModelError("photo", "Only JPG, PNG, and GIF files are allowed.");
@@ -198,7 +198,7 @@ namespace StaffValidator.WebApp.Controllers
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "💥 Error updating staff member: {StaffName} (ID: {StaffID})", 
+                _logger.LogError(ex, "💥 Error updating staff member: {StaffName} (ID: {StaffID})",
                     model.StaffName, model.StaffID);
                 TempData["Error"] = "An error occurred while updating the staff member. Please try again.";
                 return View(model);
@@ -210,7 +210,7 @@ namespace StaffValidator.WebApp.Controllers
         public IActionResult Delete(int id)
         {
             _logger.LogInformation("🗑️ Attempting to delete staff with ID: {StaffID}", id);
-            
+
             try
             {
                 var staff = _repo.Get(id);
@@ -233,7 +233,7 @@ namespace StaffValidator.WebApp.Controllers
                 }
 
                 _repo.Delete(id);
-                _logger.LogInformation("✅ Staff member deleted successfully: {StaffName} (ID: {StaffID})", 
+                _logger.LogInformation("✅ Staff member deleted successfully: {StaffName} (ID: {StaffID})",
                     staff.StaffName, staff.StaffID);
                 TempData["Success"] = $"Staff member '{staff.StaffName}' has been successfully deleted!";
                 return RedirectToAction("Index");
@@ -284,13 +284,13 @@ namespace StaffValidator.WebApp.Controllers
             {
                 using var streamReader = new StreamReader(jsonFile.OpenReadStream());
                 var jsonContent = await streamReader.ReadToEndAsync();
-                
+
                 _logger.LogInformation("📋 Parsing JSON content, size: {Size} characters", jsonContent.Length);
 
                 // Parse JSON to Staff array
-                var staffMembers = JsonSerializer.Deserialize<Staff[]>(jsonContent, new JsonSerializerOptions 
-                { 
-                    PropertyNameCaseInsensitive = true 
+                var staffMembers = JsonSerializer.Deserialize<Staff[]>(jsonContent, new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
                 });
 
                 if (staffMembers == null || staffMembers.Length == 0)
@@ -308,14 +308,14 @@ namespace StaffValidator.WebApp.Controllers
                 {
                     try
                     {
-                        // Validate using ValidatorService
+                        // Validate using ValidatorService (Hybrid)
                         var (isValid, errors) = _validatorService.ValidateAll(staff);
-                        
+
                         if (isValid)
                         {
                             // Check if staff already exists (by email)
                             var existingStaff = _repo.GetAll().FirstOrDefault(s => s.Email.Equals(staff.Email, StringComparison.OrdinalIgnoreCase));
-                            
+
                             if (existingStaff != null)
                             {
                                 _logger.LogInformation("🔄 Updating existing staff: {Email}", staff.Email);
@@ -349,11 +349,11 @@ namespace StaffValidator.WebApp.Controllers
 
                 // Prepare result message
                 var resultMessage = $"Upload completed! Successfully processed: {successCount}, Failed: {errorCount}";
-                
+
                 if (successCount > 0)
                 {
                     TempData["Success"] = resultMessage;
-                    _logger.LogInformation("✅ JSON upload completed: {SuccessCount} success, {ErrorCount} errors", 
+                    _logger.LogInformation("✅ JSON upload completed: {SuccessCount} success, {ErrorCount} errors",
                         successCount, errorCount);
                 }
 

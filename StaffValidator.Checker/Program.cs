@@ -15,7 +15,6 @@ class Checker
     static async Task<int> Main(string[] args)
     {
         Console.WriteLine("=== StaffValidator Checker ===");
-        // parse global flags
         string? globalOutput = null;
         for (int i = 0; i < args.Length; i++)
         {
@@ -26,9 +25,10 @@ class Checker
             }
         }
 
-        // simple CLI: default is data-check; use --http-check <baseUrl> to perform interface smoke tests
-        // perf/load test: --perf <baseUrl> [--endpoint /api/staff] [--concurrency 10] [--duration 30] [--username ... --password ...] [--output report.json] [--confirm-perf]
-        // ui-check: --ui-check <baseUrl> to verify MVC interface layer (HTML rendering, forms)
+        // CLI: default=data-check
+        // --http-check <baseUrl> (API/UI smoke)
+        // --ui-check <baseUrl> (verify MVC forms)
+        // --perf <baseUrl> [--endpoint /api/staff] [--concurrency 10] [--duration 30] [--username ... --password ...] [--output report.json] [--confirm-perf]
         if (args.Length >= 2 && args[0].Equals("--ui-check", StringComparison.OrdinalIgnoreCase))
         {
             var baseUrl = args[1];
@@ -43,12 +43,12 @@ class Checker
             }
             return await RunUiChecksAsync(baseUrl, username, password, outputPath);
         }
-        
+
         if (args.Length >= 2 && args[0].Equals("--http-check", StringComparison.OrdinalIgnoreCase))
         {
             var baseUrl = args[1];
 
-            // optional creds: --username <user> --password <pass>
+            // Options: --username --password
             string? username = null;
             string? password = null;
             for (int i = 2; i < args.Length; i++)
@@ -63,30 +63,29 @@ class Checker
                 }
             }
 
-            // also allow flags: --allow-unauth and --output <file>
+            // allow flags: --allow-unauth and --output <file>
             bool allowUnauth = false;
             string? outputPath = null;
             for (int i = 2; i < args.Length; i++)
             {
-                    if (args[i].Equals("--allow-unauth", StringComparison.OrdinalIgnoreCase))
-                    {
-                        allowUnauth = true;
-                    }
-                    else if (args[i].Equals("--output", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
-                    {
-                        outputPath = args[i + 1]; i++;
-                    }
+                if (args[i].Equals("--allow-unauth", StringComparison.OrdinalIgnoreCase))
+                {
+                    allowUnauth = true;
+                }
+                else if (args[i].Equals("--output", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length)
+                {
+                    outputPath = args[i + 1]; i++;
+                }
             }
 
             return await RunHttpChecksAsync(baseUrl, username, password, allowUnauth, outputPath);
         }
 
-        // perf mode
+        // Perf mode
         if (args.Length >= 2 && args[0].Equals("--perf", StringComparison.OrdinalIgnoreCase))
         {
             var baseUrl = args[1];
 
-            // defaults
             string endpoint = "/api/staff";
             int concurrency = 10;
             int durationSec = 30;
@@ -99,8 +98,8 @@ class Checker
             for (int i = 2; i < args.Length; i++)
             {
                 if (i + 1 < args.Length && args[i].Equals("--endpoint", StringComparison.OrdinalIgnoreCase)) { endpoint = args[++i]; }
-                else if (i + 1 < args.Length && args[i].Equals("--concurrency", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i+1], out var c)) { concurrency = c; i++; }
-                else if (i + 1 < args.Length && args[i].Equals("--duration", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i+1], out var d)) { durationSec = d; i++; }
+                else if (i + 1 < args.Length && args[i].Equals("--concurrency", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var c)) { concurrency = c; i++; }
+                else if (i + 1 < args.Length && args[i].Equals("--duration", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i + 1], out var d)) { durationSec = d; i++; }
                 else if (args[i].Equals("--allow-unauth", StringComparison.OrdinalIgnoreCase)) { allowUnauth = true; }
                 else if (args[i].Equals("--confirm-perf", StringComparison.OrdinalIgnoreCase)) { confirmPerf = true; }
                 else if (i + 1 < args.Length && args[i].Equals("--username", StringComparison.OrdinalIgnoreCase)) { username = args[++i]; }
@@ -108,7 +107,7 @@ class Checker
                 else if (i + 1 < args.Length && args[i].Equals("--output", StringComparison.OrdinalIgnoreCase)) { globalOutput = args[++i]; }
             }
 
-            // safety guard: cap concurrency/duration unless confirmed
+            // Guard: limit concurrency/duration unless --confirm-perf
             if (!confirmPerf)
             {
                 if (concurrency > 50)
@@ -139,8 +138,8 @@ class Checker
             MaxConcurrentRegexMatches = 4
         });
 
-    var logger = new SimpleConsoleLogger<HybridValidatorService>();
-    var validator = new HybridValidatorService(options, logger);
+        var logger = new SimpleConsoleLogger<HybridValidatorService>();
+        var validator = new HybridValidatorService(options, logger);
 
         var nfaEmail = AutomataFactory.BuildEmailNfa();
         var nfaPhone = AutomataFactory.BuildPhoneNfa();
@@ -190,7 +189,6 @@ class Checker
             }
         }
 
-        // Return non-zero exit code if mismatches found (useful for CI)
         return mismatches > 0 ? 2 : 0;
     }
 
@@ -208,10 +206,10 @@ class Checker
                 Console.WriteLine($"Authenticating as {username}...");
                 var loginPage = await http.GetAsync("/Auth/Login");
                 var loginContent = await loginPage.Content.ReadAsStringAsync();
-                
+
                 // Parse CSRF token if exists
                 var csrfToken = ExtractCsrfToken(loginContent);
-                
+
                 // Attempt form-based login
                 var formData = new Dictionary<string, string>
                 {
@@ -222,7 +220,7 @@ class Checker
                 {
                     formData["__RequestVerificationToken"] = csrfToken;
                 }
-                
+
                 var loginResp = await http.PostAsync("/Auth/Login", new FormUrlEncodedContent(formData));
                 if (loginResp.IsSuccessStatusCode || loginResp.StatusCode == System.Net.HttpStatusCode.Redirect)
                 {
@@ -254,9 +252,9 @@ class Checker
             {
                 var resp = await http.GetAsync(path);
                 var content = await resp.Content.ReadAsStringAsync();
-                
+
                 Console.WriteLine($"GET {path} -> {(int)resp.StatusCode}");
-                
+
                 if (!resp.IsSuccessStatusCode)
                 {
                     failures.Add($"{description}: returned {(int)resp.StatusCode}");
@@ -276,7 +274,6 @@ class Checker
             }
         }
 
-        // Verify form elements exist in Create page
         try
         {
             var createResp = await http.GetAsync("/Staff/Create");
@@ -284,7 +281,7 @@ class Checker
             {
                 var content = await createResp.Content.ReadAsStringAsync();
                 var requiredFields = new[] { "StaffName", "Email", "PhoneNumber" };
-                
+
                 foreach (var field in requiredFields)
                 {
                     if (!content.Contains($"name=\"{field}\"", StringComparison.OrdinalIgnoreCase) &&
@@ -293,7 +290,7 @@ class Checker
                         failures.Add($"Create form missing field: {field}");
                     }
                 }
-                
+
                 if (failures.Count == 0 || !failures.Any(f => f.Contains("Create form missing")))
                 {
                     Console.WriteLine("  ✅ Create form contains all required fields");
@@ -319,7 +316,6 @@ class Checker
             Console.WriteLine("✅ All UI layer checks passed");
         }
 
-        // Write report
         if (!string.IsNullOrEmpty(outputPath))
         {
             var report = new
@@ -348,10 +344,10 @@ class Checker
     {
         // Simple CSRF token extraction (look for __RequestVerificationToken input)
         var tokenMatch = System.Text.RegularExpressions.Regex.Match(
-            html, 
-            @"name=""__RequestVerificationToken""[^>]*value=""([^""]+)""", 
+            html,
+            @"name=""__RequestVerificationToken""[^>]*value=""([^""]+)""",
             System.Text.RegularExpressions.RegexOptions.IgnoreCase);
-        
+
         return tokenMatch.Success ? tokenMatch.Groups[1].Value : null;
     }
 
@@ -370,7 +366,6 @@ class Checker
                 var body = await loginResp.Content.ReadAsStringAsync();
                 if (loginResp.IsSuccessStatusCode)
                 {
-                    // try to parse token from common shapes
                     try
                     {
                         using var doc = System.Text.Json.JsonDocument.Parse(body);
@@ -418,8 +413,7 @@ class Checker
             }
         }
 
-        // endpoints to check
-        var endpoints = new[] { 
+        var endpoints = new[] {
             (Method: "GET", Path: "/"),
             (Method: "GET", Path: "/swagger"),
             (Method: "GET", Path: "/api/staff"),
@@ -440,7 +434,7 @@ class Checker
                 }
                 else
                 {
-                    // schema checks for GET /api/staff
+                    //checks for GET /api/staff
                     if (ep.Path.Equals("/api/staff", StringComparison.OrdinalIgnoreCase))
                     {
                         try
@@ -476,7 +470,7 @@ class Checker
             }
         }
 
-        // Try a minimal POST to /api/staff if the endpoint exists (may require auth)
+        // Try a POST to /api/staff if the endpoint exists (may require auth)
         try
         {
             var sample = new { StaffID = "test-001", StaffName = "Test User", Email = "test@example.com", PhoneNumber = "+1000000000" };
@@ -589,14 +583,14 @@ class Checker
                     return 3;
                 }
             }
-                catch (Exception ex)
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Auth attempt failed: {ex.Message}");
+                if (!allowUnauth)
                 {
-                    Console.WriteLine($"Auth attempt failed: {ex.Message}");
-                    if (!allowUnauth)
-                    {
-                        return 3;
-                    }
+                    return 3;
                 }
+            }
         }
 
         var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(durationSec));
@@ -630,7 +624,6 @@ class Checker
                 }
                 catch (OperationCanceledException)
                 {
-                    // normal on cancellation
                     break;
                 }
                 catch (Exception)
@@ -696,7 +689,7 @@ class Checker
             }
         }
 
-        // Consider any non-zero error count as non-zero exit (so CI can catch regressions)
+        // Consider any non-zero error count as non-zero exit
         return errors > 0 ? 4 : 0;
     }
 

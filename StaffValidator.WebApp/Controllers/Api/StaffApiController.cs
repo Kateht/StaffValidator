@@ -24,17 +24,14 @@ public class StaffApiController : ControllerBase
         _logger = logger;
     }
 
-    /// <summary>
     /// Get all staff members
-    /// </summary>
-    /// <returns>List of all staff members</returns>
     [HttpGet]
     [ProducesResponseType(typeof(IEnumerable<StaffDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult GetAllStaff()
     {
         _logger.LogInformation("🔍 API: Getting all staff members");
-        
+
         try
         {
             var staff = _repository.GetAll();
@@ -58,11 +55,8 @@ public class StaffApiController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Get a specific staff member by ID
-    /// </summary>
-    /// <param name="id">Staff member ID</param>
-    /// <returns>Staff member details</returns>
+    /// Get staff member by ID
+
     [HttpGet("{id}")]
     [ProducesResponseType(typeof(StaffDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -70,7 +64,7 @@ public class StaffApiController : ControllerBase
     public IActionResult GetStaff(int id)
     {
         _logger.LogInformation("🔍 API: Getting staff member with ID: {StaffID}", id);
-        
+
         try
         {
             var staff = _repository.Get(id);
@@ -100,11 +94,8 @@ public class StaffApiController : ControllerBase
         }
     }
 
-    /// <summary>
     /// Create a new staff member
-    /// </summary>
-    /// <param name="createStaffDto">Staff creation data</param>
-    /// <returns>Created staff member</returns>
+
     [HttpPost]
     [ProducesResponseType(typeof(StaffDto), StatusCodes.Status201Created)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -112,14 +103,14 @@ public class StaffApiController : ControllerBase
     public IActionResult CreateStaff([FromBody] CreateStaffDto createStaffDto)
     {
         _logger.LogInformation("➕ API: Creating new staff: {StaffName}", createStaffDto.StaffName);
-        
+
         if (!ModelState.IsValid)
         {
             _logger.LogWarning("❌ API: Invalid model state for staff creation");
             return BadRequest(new ApiResponse<object>(false, "Validation failed", ModelState));
         }
 
-        // Additional project-wide validation (email & phone) using the hybrid validator
+        // Validate email/phone using HybridValidator
         var staff = new Staff
         {
             StaffName = createStaffDto.StaffName,
@@ -149,10 +140,10 @@ public class StaffApiController : ControllerBase
                 PhotoPath = staff.PhotoPath
             };
 
-            _logger.LogInformation("✅ API: Staff created successfully: {StaffName} (ID: {StaffID})", 
+            _logger.LogInformation("✅ API: Staff created successfully: {StaffName} (ID: {StaffID})",
                 staff.StaffName, staff.StaffID);
 
-            return CreatedAtAction(nameof(GetStaff), new { id = staff.StaffID }, 
+            return CreatedAtAction(nameof(GetStaff), new { id = staff.StaffID },
                 new ApiResponse<StaffDto>(true, "Staff created successfully", staffDto));
         }
         catch (Exception ex)
@@ -162,12 +153,8 @@ public class StaffApiController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Update an existing staff member
-    /// </summary>
-    /// <param name="id">Staff member ID</param>
-    /// <param name="updateStaffDto">Staff update data</param>
-    /// <returns>Updated staff member</returns>
+    /// Update a staff member
+
     [HttpPut("{id}")]
     [ProducesResponseType(typeof(StaffDto), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status400BadRequest)]
@@ -176,7 +163,7 @@ public class StaffApiController : ControllerBase
     public IActionResult UpdateStaff(int id, [FromBody] UpdateStaffDto updateStaffDto)
     {
         _logger.LogInformation("✏️ API: Updating staff with ID: {StaffID}", id);
-        
+
         if (!ModelState.IsValid)
         {
             _logger.LogWarning("❌ API: Invalid model state for staff update");
@@ -192,7 +179,7 @@ public class StaffApiController : ControllerBase
                 return NotFound(new ApiResponse<object>(false, $"Staff member with ID {id} not found"));
             }
 
-            // Apply updates onto a new Staff instance for validation
+            // Apply updates to a new instance for validation
             var updated = new Staff
             {
                 StaffID = existingStaff.StaffID,
@@ -237,11 +224,8 @@ public class StaffApiController : ControllerBase
         }
     }
 
-    /// <summary>
     /// Delete a staff member
-    /// </summary>
-    /// <param name="id">Staff member ID</param>
-    /// <returns>Confirmation of deletion</returns>
+
     [HttpDelete("{id}")]
     [ProducesResponseType(StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status404NotFound)]
@@ -250,7 +234,7 @@ public class StaffApiController : ControllerBase
     public IActionResult DeleteStaff(int id)
     {
         _logger.LogInformation("🗑️ API: Deleting staff with ID: {StaffID}", id);
-        
+
         try
         {
             var staff = _repository.Get(id);
@@ -272,18 +256,14 @@ public class StaffApiController : ControllerBase
         }
     }
 
-    /// <summary>
-    /// Search staff members
-    /// </summary>
-    /// <param name="searchTerm">Search term to find staff by name or email</param>
-    /// <returns>Matching staff members</returns>
+    /// Search staff by name/email
     [HttpGet("search")]
     [ProducesResponseType(typeof(IEnumerable<StaffDto>), StatusCodes.Status200OK)]
     [ProducesResponseType(StatusCodes.Status401Unauthorized)]
     public IActionResult SearchStaff([FromQuery, Required] string searchTerm)
     {
         _logger.LogInformation("🔍 API: Searching staff with term: {SearchTerm}", searchTerm);
-        
+
         try
         {
             var staff = _repository.Search(searchTerm);
@@ -297,7 +277,7 @@ public class StaffApiController : ControllerBase
                 PhotoPath = s.PhotoPath
             });
 
-            _logger.LogInformation("✅ API: Found {Count} staff members for search term: {SearchTerm}", 
+            _logger.LogInformation("✅ API: Found {Count} staff members for search term: {SearchTerm}",
                 staff.Count(), searchTerm);
 
             return Ok(new ApiResponse<IEnumerable<StaffDto>>(true, "Search completed successfully", staffDto));

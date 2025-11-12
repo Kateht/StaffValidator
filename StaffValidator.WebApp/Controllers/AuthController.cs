@@ -22,7 +22,7 @@ public class AuthController : Controller
         ViewData["ReturnUrl"] = returnUrl;
         if (!string.IsNullOrEmpty(error))
         {
-            // Map known error codes from API/browser redirects to user-friendly messages
+
             var message = error.ToLowerInvariant() switch
             {
                 "invalid" => "Invalid username or password.",
@@ -37,13 +37,11 @@ public class AuthController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
     {
-        // Log incoming content-type to help diagnose 415 Unsupported Media Type
         _logger.LogInformation("🔐 Login attempt for user: {Username}", model.Username);
         _logger.LogInformation("Request Content-Type: {ContentType}", Request.ContentType ?? "(none)");
-        
+
         if (!ModelState.IsValid)
         {
-            // Log model binding errors for diagnostics
             var errors = string.Join("; ", ModelState.Values
                 .SelectMany(v => v.Errors)
                 .Select(e => e.ErrorMessage + (e.Exception != null ? (": " + e.Exception.Message) : "")));
@@ -52,7 +50,7 @@ public class AuthController : Controller
         }
 
         var result = await _authService.AuthenticateAsync(model.Username, model.Password);
-        
+
         if (result.Success && result.Token != null)
         {
             // Store JWT token in cookie
@@ -63,17 +61,17 @@ public class AuthController : Controller
                 SameSite = SameSiteMode.Strict,
                 Expires = DateTimeOffset.UtcNow.AddHours(1)
             };
-            
+
             Response.Cookies.Append("AuthToken", result.Token, cookieOptions);
-            
+
             _logger.LogInformation("✅ Login successful for user: {Username}", model.Username);
             TempData["Success"] = $"Welcome back, {model.Username}!";
-            
+
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
             {
                 return Redirect(returnUrl);
             }
-            
+
             return RedirectToAction("Index", "Staff");
         }
 
@@ -82,8 +80,8 @@ public class AuthController : Controller
         return View(model);
     }
 
-    private bool RegistrationEnabled => string.IsNullOrWhiteSpace(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Security:EnableSelfRegistration"]) 
-        ? true 
+    private bool RegistrationEnabled => string.IsNullOrWhiteSpace(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Security:EnableSelfRegistration"])
+        ? true
         : bool.TryParse(HttpContext.RequestServices.GetRequiredService<IConfiguration>()["Security:EnableSelfRegistration"], out var b) ? b : true;
 
     [HttpGet]
@@ -114,7 +112,7 @@ public class AuthController : Controller
 
         if (!_authService.IsStrongPassword(model.Password))
         {
-            ModelState.AddModelError(nameof(model.Password), "Password too weak (need uppercase + digit)" );
+            ModelState.AddModelError(nameof(model.Password), "Password too weak (need uppercase + digit)");
             return View(model);
         }
 
@@ -125,7 +123,7 @@ public class AuthController : Controller
             return View(model);
         }
 
-        // Auto-login after successful registration for convenience
+
         if (!string.IsNullOrEmpty(result.Token))
         {
             Response.Cookies.Append("AuthToken", result.Token, new CookieOptions
@@ -170,9 +168,8 @@ public class AuthController : Controller
             return RedirectToAction("ResetPassword", new { token = resetToken });
         }
 
-    // Privileged or suppressed issuance: show generic error to the user (red)
-    TempData["Error"] = "Account doesn't exist";
-    return View(model);
+        TempData["Error"] = "Account doesn't exist";
+        return View(model);
     }
 
     [HttpGet]
@@ -212,10 +209,10 @@ public class AuthController : Controller
     public IActionResult Logout()
     {
         _logger.LogInformation("🚪 User logout");
-        
+
         // Remove JWT token cookie
         Response.Cookies.Delete("AuthToken");
-        
+
         TempData["Success"] = "You have been logged out successfully.";
         return RedirectToAction("Login");
     }
@@ -226,14 +223,14 @@ public class AuthController : Controller
     {
         var username = User.Identity?.Name;
         var role = User.FindFirst("role")?.Value ?? User.FindFirst(System.Security.Claims.ClaimTypes.Role)?.Value;
-        
+
         var model = new ProfileViewModel
         {
             Username = username ?? "Unknown",
             Email = User.FindFirst(System.Security.Claims.ClaimTypes.Email)?.Value ?? "",
             Role = role ?? "User"
         };
-        
+
         return View(model);
     }
 }

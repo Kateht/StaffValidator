@@ -9,7 +9,7 @@ using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
 
-// Configure Serilog early in the application lifecycle
+// Serilog setup
 Log.Logger = new LoggerConfiguration()
     .MinimumLevel.Override("Microsoft", LogEventLevel.Warning)
     .MinimumLevel.Override("Microsoft.Hosting.Lifetime", LogEventLevel.Information)
@@ -27,14 +27,12 @@ try
     Log.Information("🚀 Starting StaffValidator Web Application...");
 
     var builder = WebApplication.CreateBuilder(args);
-    
-    // Add Serilog to the host
+
     builder.Host.UseSerilog();
-    
-    // Add controllers and views
+
     builder.Services.AddControllersWithViews();
-    
-    // Add API Explorer and Swagger
+
+    // Swagger
     builder.Services.AddEndpointsApiExplorer();
     builder.Services.AddSwaggerGen(options =>
     {
@@ -50,7 +48,7 @@ try
             }
         });
 
-        // Include XML comments
+        // XML docs
         var xmlFile = $"{System.Reflection.Assembly.GetExecutingAssembly().GetName().Name}.xml";
         var xmlPath = Path.Combine(AppContext.BaseDirectory, xmlFile);
         if (File.Exists(xmlPath))
@@ -58,7 +56,7 @@ try
             options.IncludeXmlComments(xmlPath);
         }
 
-        // Add JWT authentication to Swagger
+        // Swagger: JWT security
         options.AddSecurityDefinition("Bearer", new Microsoft.OpenApi.Models.OpenApiSecurityScheme
         {
             Description = "JWT Authorization header using the Bearer scheme. Enter 'Bearer' [space] and then your token in the text input below.",
@@ -83,14 +81,13 @@ try
             }
         });
     });
-    
-    // Configure JSON Repository with sample data
+
+    // Repository from config
     builder.Services.Configure<StaffRepositoryOptions>(builder.Configuration.GetSection("Data"));
     builder.Services.AddSingleton<IStaffRepository>(sp =>
         new StaffRepository(sp.GetRequiredService<IOptions<StaffRepositoryOptions>>()));
-    
-    // Register application services
-    // Configure HybridValidation options from configuration
+
+    // DI: validators/auth & HybridValidation options
     builder.Services.Configure<HybridValidationOptions>(builder.Configuration.GetSection("HybridValidation"));
 
     // Use the HybridValidatorService as the concrete implementation for ValidatorService
@@ -136,7 +133,7 @@ try
             ClockSkew = TimeSpan.Zero
         };
 
-        // Handle tokens from cookies for web app
+        // Read JWT from cookie
         options.Events = new JwtBearerEvents
         {
             OnMessageReceived = context =>
@@ -150,8 +147,6 @@ try
             },
             OnChallenge = context =>
             {
-                // For browser requests to MVC pages (non-API), redirect to Login instead of returning 401
-                // Keep default 401 for API routes
                 if (!context.Handled && context.Request.Path.HasValue && !context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
                 {
                     context.HandleResponse();
@@ -180,7 +175,7 @@ try
     }
     else
     {
-        // Enable Swagger in development
+        // Swagger in development
         app.UseSwagger();
         app.UseSwaggerUI(options =>
         {
@@ -194,19 +189,18 @@ try
 
     app.UseStaticFiles();
     app.UseRouting();
-    
+
     // Add authentication and authorization middleware
     app.UseAuthentication();
     app.UseAuthorization();
     app.UseRateLimiter();
 
-    // Friendly redirect for accidental browser GET to API login endpoint
     app.MapGet("/api/auth/login", (HttpContext ctx) =>
     {
         ctx.Response.Redirect("/Auth/Login");
         return Results.Empty;
     }).AllowAnonymous();
-    
+
     app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Staff}/{action=Index}/{id?}");
@@ -223,5 +217,4 @@ finally
     Log.CloseAndFlush();
 }
 
-// Expose Program class for integration testing (WebApplicationFactory)
 public partial class Program { }
