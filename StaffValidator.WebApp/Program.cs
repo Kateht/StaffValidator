@@ -131,6 +131,18 @@ try
                     context.Token = token;
                 }
                 return Task.CompletedTask;
+            },
+            OnChallenge = context =>
+            {
+                // For browser requests to MVC pages (non-API), redirect to Login instead of returning 401
+                // Keep default 401 for API routes
+                if (!context.Handled && context.Request.Path.HasValue && !context.Request.Path.StartsWithSegments("/api", StringComparison.OrdinalIgnoreCase))
+                {
+                    context.HandleResponse();
+                    var returnUrl = Uri.EscapeDataString(context.Request.Path + context.Request.QueryString);
+                    context.Response.Redirect($"/Auth/Login?returnUrl={returnUrl}");
+                }
+                return Task.CompletedTask;
             }
         };
     });

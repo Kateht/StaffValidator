@@ -27,10 +27,17 @@ public class AuthController : Controller
     [ValidateAntiForgeryToken]
     public async Task<IActionResult> Login(LoginViewModel model, string? returnUrl = null)
     {
+        // Log incoming content-type to help diagnose 415 Unsupported Media Type
         _logger.LogInformation("🔐 Login attempt for user: {Username}", model.Username);
+        _logger.LogInformation("Request Content-Type: {ContentType}", Request.ContentType ?? "(none)");
         
         if (!ModelState.IsValid)
         {
+            // Log model binding errors for diagnostics
+            var errors = string.Join("; ", ModelState.Values
+                .SelectMany(v => v.Errors)
+                .Select(e => e.ErrorMessage + (e.Exception != null ? (": " + e.Exception.Message) : "")));
+            _logger.LogWarning("ModelState invalid during login POST. Errors: {Errors}", string.IsNullOrEmpty(errors) ? "(none)" : errors);
             return View(model);
         }
 
@@ -53,7 +60,9 @@ public class AuthController : Controller
             TempData["Success"] = $"Welcome back, {model.Username}!";
             
             if (!string.IsNullOrEmpty(returnUrl) && Url.IsLocalUrl(returnUrl))
+            {
                 return Redirect(returnUrl);
+            }
             
             return RedirectToAction("Index", "Staff");
         }

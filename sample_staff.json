@@ -1,0 +1,20 @@
+[
+  {
+    "staffName": "Alice Johnson",
+    "email": "alice.johnson@company.com",
+    "phoneNumber": "+1-555-0125",
+    "startingDate": "2024-03-01T00:00:00"
+  },
+  {
+    "staffName": "Charlie Brown",
+    "email": "charlie.brown@company.com",
+    "phoneNumber": "+1-555-0126",
+    "startingDate": "2024-04-01T00:00:00"
+  },
+  {
+    "staffName": "Diana Prince",
+    "email": "diana.prince@company.com",
+    "phoneNumber": "+1-555-0127",
+    "startingDate": "2024-05-01T00:00:00"
+  }
+]
