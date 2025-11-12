@@ -10,12 +10,12 @@ namespace StaffValidator.Tests
     /// Interface layer verification for the web application
     /// Tests UI components, form validation, and user interactions
     /// </summary>
-    public class InterfaceVerificationTests : IClassFixture<WebApplicationFactory<Program>>
+    public class InterfaceVerificationTests : IClassFixture<TestWebApplicationFactory>
     {
-        private readonly WebApplicationFactory<Program> _factory;
+        private readonly TestWebApplicationFactory _factory;
         private readonly HttpClient _client;
 
-        public InterfaceVerificationTests(WebApplicationFactory<Program> factory)
+        public InterfaceVerificationTests(TestWebApplicationFactory factory)
         {
             _factory = factory;
             _client = _factory.CreateClient();
@@ -48,18 +48,20 @@ namespace StaffValidator.Tests
             var doc = new HtmlDocument();
             doc.LoadHtml(content);
 
-            // Verify form validation elements
+            // Verify form validation elements - using id attribute instead of asp-for
             var emailInput = doc.DocumentNode.SelectSingleNode("//input[@type='email']");
             var phoneInput = doc.DocumentNode.SelectSingleNode("//input[@type='tel']");
-            var nameInput = doc.DocumentNode.SelectSingleNode("//input[@asp-for='StaffName']");
+            var nameInput = doc.DocumentNode.SelectSingleNode("//input[@id='StaffName']");
             
             Assert.NotNull(emailInput);
             Assert.NotNull(phoneInput);
             Assert.NotNull(nameInput);
             
-            // Verify required attributes
-            Assert.Equal("required", nameInput.GetAttributeValue("required", ""));
-            Assert.Equal("required", emailInput.GetAttributeValue("required", ""));
+            // Verify required attributes exist (value can be empty string or "required")
+            var nameRequired = nameInput.GetAttributeValue("required", null);
+            var emailRequired = emailInput.GetAttributeValue("required", null);
+            Assert.NotNull(nameRequired); // attribute exists
+            Assert.NotNull(emailRequired); // attribute exists
         }
 
         [Fact]

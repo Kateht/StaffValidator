@@ -8,7 +8,7 @@ using System.ComponentModel.DataAnnotations;
 namespace StaffValidator.WebApp.Controllers.Api;
 
 [ApiController]
-[Route("api/[controller]")]
+[Route("api/staff")]
 [Authorize]
 [Produces("application/json")]
 public class StaffApiController : ControllerBase

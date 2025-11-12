@@ -17,5 +17,10 @@ namespace StaffValidator.Core.Services
         /// Defaults to 4.
         /// </summary>
         public int MaxConcurrentRegexMatches { get; set; } = 4;
+        /// <summary>
+        /// Enable or disable DFA fallback when regex times out or fails.
+        /// Defaults to true.
+        /// </summary>
+        public bool EnableDfaFallback { get; set; } = true;
     }
 }

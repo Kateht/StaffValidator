@@ -137,10 +137,22 @@ dotnet run --project StaffValidator.Checker -- --http-check http://localhost:500
 dotnet run --project StaffValidator.Checker -- --http-check http://localhost:5000 --username admin --password admin123 --output checker-report.json
 ```
 
+UI layer verification (MVC Views, Forms, HTML rendering)
+
+```powershell
+# Verify MVC interface layer
+dotnet run --project StaffValidator.Checker -- --ui-check http://localhost:5000 --username admin --password admin123
+
+# With JSON report
+dotnet run --project StaffValidator.Checker -- --ui-check http://localhost:5000 --username admin --password admin123 --output ui-report.json
+```
+
 Exit codes (useful for CI):
 - `0` — success (no mismatches / no HTTP failures)
 - `2` — data mismatches found
 - `3` — HTTP smoke-check failures or authentication required but not obtained
+- `4` — performance test errors detected
+- `5` — UI layer verification failures
 
 ---
 
@@ -173,9 +185,10 @@ Purpose: provide a small console verification tool to validate both the data/val
 
 Modes:
 
-- Data-check (default): Reads `data/staff_records.json`, validates each record using `HybridValidatorService`, compares with automata, prints mismatches, writes report (if `--output`), and exits with code 0 (no mismatches) or 2 (mismatches present).
-- HTTP smoke-check: `--http-check <baseUrl>` runs a set of HTTP requests to verify the web app is up and returns expected results. Supports authentication via `--username` and `--password` (POST `/api/auth/login`) and writing a JSON report with `--output <file>`.
-- Performance test (safe stress): `--perf <baseUrl> [--endpoint /api/staff] [--concurrency 10] [--duration 30] [--username ... --password ...] [--output report.json] [--confirm-perf]`
+- **Data-check (default)**: Reads `data/staff_records.json`, validates each record using `HybridValidatorService`, compares with automata, prints mismatches, writes report (if `--output`), and exits with code 0 (no mismatches) or 2 (mismatches present).
+- **HTTP smoke-check**: `--http-check <baseUrl>` runs a set of HTTP requests to verify the web app is up and returns expected results. Supports authentication via `--username` and `--password` (POST `/api/auth/login`) and writing a JSON report with `--output <file>`.
+- **UI layer verification**: `--ui-check <baseUrl>` verifies MVC Views, form rendering, HTML content, and CSRF tokens. Tests the presentation/interface layer by requesting pages like `/`, `/Staff`, `/Staff/Create`, and validating HTML structure and expected content. Supports form-based authentication and JSON report output.
+- **Performance test (safe stress)**: `--perf <baseUrl> [--endpoint /api/staff] [--concurrency 10] [--duration 30] [--username ... --password ...] [--output report.json] [--confirm-perf]`
   - Sends concurrent GET requests to the specified endpoint for the given duration.
   - Reports totals, RPS, and latency percentiles (avg, p50, p95, p99) and status code counts.
   - Safety: by default caps `--concurrency` at 50 and `--duration` at 60s unless `--confirm-perf` is provided.

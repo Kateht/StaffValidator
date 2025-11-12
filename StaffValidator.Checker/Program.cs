@@ -28,6 +28,22 @@ class Checker
 
         // simple CLI: default is data-check; use --http-check <baseUrl> to perform interface smoke tests
         // perf/load test: --perf <baseUrl> [--endpoint /api/staff] [--concurrency 10] [--duration 30] [--username ... --password ...] [--output report.json] [--confirm-perf]
+        // ui-check: --ui-check <baseUrl> to verify MVC interface layer (HTML rendering, forms)
+        if (args.Length >= 2 && args[0].Equals("--ui-check", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseUrl = args[1];
+            string? username = null;
+            string? password = null;
+            string? outputPath = null;
+            for (int i = 2; i < args.Length; i++)
+            {
+                if (args[i].Equals("--username", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) { username = args[++i]; }
+                else if (args[i].Equals("--password", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) { password = args[++i]; }
+                else if (args[i].Equals("--output", StringComparison.OrdinalIgnoreCase) && i + 1 < args.Length) { outputPath = args[++i]; }
+            }
+            return await RunUiChecksAsync(baseUrl, username, password, outputPath);
+        }
+        
         if (args.Length >= 2 && args[0].Equals("--http-check", StringComparison.OrdinalIgnoreCase))
         {
             var baseUrl = args[1];
@@ -176,6 +192,167 @@ class Checker
 
         // Return non-zero exit code if mismatches found (useful for CI)
         return mismatches > 0 ? 2 : 0;
+    }
+
+    private static async Task<int> RunUiChecksAsync(string baseUrl, string? username = null, string? password = null, string? outputPath = null)
+    {
+        Console.WriteLine($"Running UI layer verification against {baseUrl}");
+        using var http = new HttpClient { BaseAddress = new Uri(baseUrl) };
+        var failures = new List<string>();
+
+        // Authenticate if credentials provided
+        if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+        {
+            try
+            {
+                Console.WriteLine($"Authenticating as {username}...");
+                var loginPage = await http.GetAsync("/Auth/Login");
+                var loginContent = await loginPage.Content.ReadAsStringAsync();
+                
+                // Parse CSRF token if exists
+                var csrfToken = ExtractCsrfToken(loginContent);
+                
+                // Attempt form-based login
+                var formData = new Dictionary<string, string>
+                {
+                    ["Username"] = username,
+                    ["Password"] = password
+                };
+                if (!string.IsNullOrEmpty(csrfToken))
+                {
+                    formData["__RequestVerificationToken"] = csrfToken;
+                }
+                
+                var loginResp = await http.PostAsync("/Auth/Login", new FormUrlEncodedContent(formData));
+                if (loginResp.IsSuccessStatusCode || loginResp.StatusCode == System.Net.HttpStatusCode.Redirect)
+                {
+                    Console.WriteLine("✅ UI authentication succeeded");
+                }
+                else
+                {
+                    failures.Add($"UI login failed with status {(int)loginResp.StatusCode}");
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"UI authentication error: {ex.Message}");
+            }
+        }
+
+        // Check MVC Views (Interface Layer verification)
+        var uiEndpoints = new[]
+        {
+            ("/", "Staff Management", "Home/Index page"),
+            ("/Staff", "Staff", "Staff list page"),
+            ("/Staff/Create", "Add", "Create staff form"),
+            ("/Auth/Login", "Login", "Login page")
+        };
+
+        foreach (var (path, expectedText, description) in uiEndpoints)
+        {
+            try
+            {
+                var resp = await http.GetAsync(path);
+                var content = await resp.Content.ReadAsStringAsync();
+                
+                Console.WriteLine($"GET {path} -> {(int)resp.StatusCode}");
+                
+                if (!resp.IsSuccessStatusCode)
+                {
+                    failures.Add($"{description}: returned {(int)resp.StatusCode}");
+                }
+                else if (!content.Contains(expectedText, StringComparison.OrdinalIgnoreCase))
+                {
+                    failures.Add($"{description}: missing expected text '{expectedText}'");
+                }
+                else
+                {
+                    Console.WriteLine($"  ✅ {description} rendered correctly");
+                }
+            }
+            catch (Exception ex)
+            {
+                failures.Add($"{description}: {ex.GetType().Name} - {ex.Message}");
+            }
+        }
+
+        // Verify form elements exist in Create page
+        try
+        {
+            var createResp = await http.GetAsync("/Staff/Create");
+            if (createResp.IsSuccessStatusCode)
+            {
+                var content = await createResp.Content.ReadAsStringAsync();
+                var requiredFields = new[] { "StaffName", "Email", "PhoneNumber" };
+                
+                foreach (var field in requiredFields)
+                {
+                    if (!content.Contains($"name=\"{field}\"", StringComparison.OrdinalIgnoreCase) &&
+                        !content.Contains($"asp-for=\"{field}\"", StringComparison.OrdinalIgnoreCase))
+                    {
+                        failures.Add($"Create form missing field: {field}");
+                    }
+                }
+                
+                if (failures.Count == 0 || !failures.Any(f => f.Contains("Create form missing")))
+                {
+                    Console.WriteLine("  ✅ Create form contains all required fields");
+                }
+            }
+        }
+        catch (Exception ex)
+        {
+            failures.Add($"Create form verification error: {ex.Message}");
+        }
+
+        Console.WriteLine("\n=== UI Layer Verification Summary ===");
+        if (failures.Count > 0)
+        {
+            Console.WriteLine("❌ Failures detected:");
+            foreach (var f in failures)
+            {
+                Console.WriteLine($"  - {f}");
+            }
+        }
+        else
+        {
+            Console.WriteLine("✅ All UI layer checks passed");
+        }
+
+        // Write report
+        if (!string.IsNullOrEmpty(outputPath))
+        {
+            var report = new
+            {
+                mode = "ui-check",
+                baseUrl,
+                timestamp = DateTime.UtcNow,
+                failures,
+                success = failures.Count == 0
+            };
+            try
+            {
+                System.IO.File.WriteAllText(outputPath, System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                Console.WriteLine($"\n📄 Report written to {outputPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"⚠️ Failed writing report: {ex.Message}");
+            }
+        }
+
+        return failures.Count > 0 ? 5 : 0;
+    }
+
+    private static string? ExtractCsrfToken(string html)
+    {
+        // Simple CSRF token extraction (look for __RequestVerificationToken input)
+        var tokenMatch = System.Text.RegularExpressions.Regex.Match(
+            html, 
+            @"name=""__RequestVerificationToken""[^>]*value=""([^""]+)""", 
+            System.Text.RegularExpressions.RegexOptions.IgnoreCase);
+        
+        return tokenMatch.Success ? tokenMatch.Groups[1].Value : null;
     }
 
     private static async Task<int> RunHttpChecksAsync(string baseUrl, string? username = null, string? password = null, bool allowUnauth = false, string? outputPath = null)

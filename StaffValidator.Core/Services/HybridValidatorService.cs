@@ -17,6 +17,7 @@ namespace StaffValidator.Core.Services
     public class HybridValidatorService : ValidatorService
     {
         private readonly ValidatorService _regexService = new();
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SimpleNfa> _dfaCache = new();
 
         private readonly int _maxConcurrentRegexMatches;
 
@@ -25,6 +26,7 @@ namespace StaffValidator.Core.Services
 
         private readonly System.Threading.SemaphoreSlim _semaphore;
         private readonly ILogger<HybridValidatorService> _logger;
+    private readonly bool _enableDfaFallback = true;
 
         public HybridValidatorService(IOptions<HybridValidationOptions> options, ILogger<HybridValidatorService> logger)
         {
@@ -39,12 +41,19 @@ namespace StaffValidator.Core.Services
                 var max = options.Value.MaxConcurrentRegexMatches > 0 ? options.Value.MaxConcurrentRegexMatches : 4;
                 _maxConcurrentRegexMatches = max;
                 _semaphore = new System.Threading.SemaphoreSlim(max, max);
+                _enableDfaFallback = options.Value.EnableDfaFallback;
             }
             else
             {
                 _maxConcurrentRegexMatches = 4;
                 _semaphore = new System.Threading.SemaphoreSlim(4, 4);
             }
+        }
+
+        // Backwards-compatible constructor used by tests or callers that don't provide a logger
+        public HybridValidatorService(IOptions<HybridValidationOptions> options)
+            : this(options, Microsoft.Extensions.Logging.Abstractions.NullLogger<HybridValidatorService>.Instance)
+        {
         }
 
         public override (bool ok, List<string> errors) ValidateAll(object obj)
@@ -101,8 +110,13 @@ namespace StaffValidator.Core.Services
                             continue;
                         }
 
-                        // regex did not match; try DFA fallback for known types
-                        bool fallbackOk = TryDfaFallback(attr, value);
+                        // regex did not match; try DFA fallback for known types if enabled
+                        bool fallbackOk = false;
+                        if (_enableDfaFallback)
+                        {
+                            fallbackOk = TryDfaFallback(attr, value);
+                        }
+
                         if (!fallbackOk)
                         {
                             errors.Add($"{p.Name}: invalid format ({attr.Pattern})");
@@ -113,24 +127,38 @@ namespace StaffValidator.Core.Services
                         try { _semaphore.Release(); } catch { }
                     }
                 }
-                catch (ArgumentException)
+                    catch (ArgumentException)
                 {
                     // invalid regex - try DFA fallback
-                    _logger?.LogWarning("Invalid regex for property {Property}: {Pattern}. Falling back to DFA.", p.Name, attr.Pattern);
-                    bool fallbackOk = TryDfaFallback(attr, value);
-                    if (!fallbackOk)
-                    {
-                        errors.Add($"{p.Name}: invalid regex/format ({attr.Pattern})");
-                    }
+                        _logger?.LogWarning("Invalid regex for property {Property}: {Pattern}.", p.Name, attr.Pattern);
+                        if (_enableDfaFallback)
+                        {
+                            bool fallbackOk = TryDfaFallback(attr, value);
+                            if (!fallbackOk)
+                            {
+                                errors.Add($"{p.Name}: invalid regex/format ({attr.Pattern})");
+                            }
+                        }
+                        else
+                        {
+                            errors.Add($"{p.Name}: invalid regex ({attr.Pattern})");
+                        }
                 }
                 catch (RegexMatchTimeoutException)
                 {
                     // Timeout occurred while evaluating the regex; fallback to DFA
-                    _logger?.LogWarning("Regex match timeout ({Timeout}ms) for property {Property} pattern {Pattern}. Falling back to DFA.", RegexTimeoutMs, p.Name, attr.Pattern);
-                    bool fallbackOk = TryDfaFallback(attr, value);
-                    if (!fallbackOk)
+                    _logger?.LogWarning("Regex match timeout ({Timeout}ms) for property {Property} pattern {Pattern}.", RegexTimeoutMs, p.Name, attr.Pattern);
+                    if (_enableDfaFallback)
                     {
-                        errors.Add($"{p.Name}: regex timeout/validation failed ({attr.Pattern})");
+                        bool fallbackOk = TryDfaFallback(attr, value);
+                        if (!fallbackOk)
+                        {
+                            errors.Add($"{p.Name}: regex timeout/validation failed ({attr.Pattern})");
+                        }
+                    }
+                    else
+                    {
+                        errors.Add($"{p.Name}: regex timeout ({attr.Pattern})");
                     }
                 }
             }
@@ -140,16 +168,24 @@ namespace StaffValidator.Core.Services
 
         private bool TryDfaFallback(Attributes.RegexCheckAttribute attr, string value)
         {
+            var pattern = attr.Pattern;
+            var inputLength = value?.Length ?? 0;
+            var sw = System.Diagnostics.Stopwatch.StartNew();
             // Only pragmatic fallbacks supported for email and phone attributes
             if (attr is Attributes.EmailCheckAttribute)
             {
                 try
                 {
-                    var nfa = AutomataFactory.BuildEmailNfa();
-                    return nfa.Simulate(value);
+                    var nfa = _dfaCache.GetOrAdd("email", _ => AutomataFactory.BuildEmailNfa());
+                    var result = nfa.Simulate(value ?? string.Empty);
+                    sw.Stop();
+                    _logger?.LogWarning("⚠️ DFA fallback result | pattern={Pattern} | inputLength={Len} | elapsedMs={Ms} | fallbackResult={Result}", pattern, inputLength, sw.ElapsedMilliseconds, result);
+                    return result;
                 }
                 catch
                 {
+                    sw.Stop();
+                    _logger?.LogWarning("⚠️ DFA fallback failed for pattern={Pattern} | inputLength={Len} | elapsedMs={Ms}", pattern, inputLength, sw.ElapsedMilliseconds);
                     return false;
                 }
             }
@@ -158,11 +194,16 @@ namespace StaffValidator.Core.Services
             {
                 try
                 {
-                    var nfa = AutomataFactory.BuildPhoneNfa();
-                    return nfa.Simulate(value);
+                    var nfa = _dfaCache.GetOrAdd("phone", _ => AutomataFactory.BuildPhoneNfa());
+                    var result = nfa.Simulate(value ?? string.Empty);
+                    sw.Stop();
+                    _logger?.LogWarning("⚠️ DFA fallback result | pattern={Pattern} | inputLength={Len} | elapsedMs={Ms} | fallbackResult={Result}", pattern, inputLength, sw.ElapsedMilliseconds, result);
+                    return result;
                 }
                 catch
                 {
+                    sw.Stop();
+                    _logger?.LogWarning("⚠️ DFA fallback failed for pattern={Pattern} | inputLength={Len} | elapsedMs={Ms}", pattern, inputLength, sw.ElapsedMilliseconds);
                     return false;
                 }
             }

@@ -7,11 +7,11 @@ using Xunit;
 
 namespace StaffValidator.Tests
 {
-    public class WebAppIntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+    public class WebAppIntegrationTests : IClassFixture<TestWebApplicationFactory>
     {
-        private readonly WebApplicationFactory<Program> _factory;
+        private readonly TestWebApplicationFactory _factory;
 
-        public WebAppIntegrationTests(WebApplicationFactory<Program> factory)
+        public WebAppIntegrationTests(TestWebApplicationFactory factory)
         {
             _factory = factory;
         }
@@ -25,10 +25,17 @@ namespace StaffValidator.Tests
 
             var content = await resp.Content.ReadAsStringAsync();
             using var doc = JsonDocument.Parse(content);
-            Assert.Equal(JsonValueKind.Array, doc.RootElement.ValueKind);
-            if (doc.RootElement.GetArrayLength() > 0)
+            
+            // API returns wrapped response with Success, Message, Data, Timestamp
+            Assert.Equal(JsonValueKind.Object, doc.RootElement.ValueKind);
+            Assert.True(doc.RootElement.TryGetProperty("data", out var dataEl) || doc.RootElement.TryGetProperty("Data", out dataEl));
+            
+            // Data should be an array
+            Assert.Equal(JsonValueKind.Array, dataEl.ValueKind);
+            
+            if (dataEl.GetArrayLength() > 0)
             {
-                var el = doc.RootElement[0];
+                var el = dataEl[0];
                 Assert.True(el.TryGetProperty("StaffID", out _ ) || el.TryGetProperty("staffID", out _));
                 Assert.True(el.TryGetProperty("StaffName", out _) || el.TryGetProperty("staffName", out _));
                 Assert.True(el.TryGetProperty("Email", out _) || el.TryGetProperty("email", out _));

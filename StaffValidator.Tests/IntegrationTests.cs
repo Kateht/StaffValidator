@@ -5,11 +5,11 @@ using Xunit;
 
 namespace StaffValidator.Tests
 {
-    public class IntegrationTests : IClassFixture<WebApplicationFactory<Program>>
+    public class IntegrationTests : IClassFixture<TestWebApplicationFactory>
     {
-        private readonly WebApplicationFactory<Program> _factory;
+        private readonly TestWebApplicationFactory _factory;
 
-        public IntegrationTests(WebApplicationFactory<Program> factory)
+        public IntegrationTests(TestWebApplicationFactory factory)
         {
             _factory = factory;
         }
@@ -22,7 +22,7 @@ namespace StaffValidator.Tests
             var content = await resp.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-            Assert.Contains("Staff list", content);
+            Assert.Contains("Staff Management", content);
         }
 
         [Fact]
@@ -33,7 +33,7 @@ namespace StaffValidator.Tests
             var content = await resp.Content.ReadAsStringAsync();
 
             Assert.Equal(HttpStatusCode.OK, resp.StatusCode);
-            Assert.Contains("Add staff", content);
+            Assert.Contains("Add New Staff", content);
         }
     }
 }
