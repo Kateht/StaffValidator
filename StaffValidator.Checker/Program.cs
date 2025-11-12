@@ -1,5 +1,7 @@
 using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.Linq;
 using System.Net.Http;
 using System.Net.Http.Json;
 using System.Threading.Tasks;
@@ -25,6 +27,7 @@ class Checker
         }
 
         // simple CLI: default is data-check; use --http-check <baseUrl> to perform interface smoke tests
+        // perf/load test: --perf <baseUrl> [--endpoint /api/staff] [--concurrency 10] [--duration 30] [--username ... --password ...] [--output report.json] [--confirm-perf]
         if (args.Length >= 2 && args[0].Equals("--http-check", StringComparison.OrdinalIgnoreCase))
         {
             var baseUrl = args[1];
@@ -60,6 +63,49 @@ class Checker
             }
 
             return await RunHttpChecksAsync(baseUrl, username, password, allowUnauth, outputPath);
+        }
+
+        // perf mode
+        if (args.Length >= 2 && args[0].Equals("--perf", StringComparison.OrdinalIgnoreCase))
+        {
+            var baseUrl = args[1];
+
+            // defaults
+            string endpoint = "/api/staff";
+            int concurrency = 10;
+            int durationSec = 30;
+            bool allowUnauth = false;
+            bool confirmPerf = false;
+            string? username = null;
+            string? password = null;
+
+            // parse options
+            for (int i = 2; i < args.Length; i++)
+            {
+                if (i + 1 < args.Length && args[i].Equals("--endpoint", StringComparison.OrdinalIgnoreCase)) { endpoint = args[++i]; }
+                else if (i + 1 < args.Length && args[i].Equals("--concurrency", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i+1], out var c)) { concurrency = c; i++; }
+                else if (i + 1 < args.Length && args[i].Equals("--duration", StringComparison.OrdinalIgnoreCase) && int.TryParse(args[i+1], out var d)) { durationSec = d; i++; }
+                else if (args[i].Equals("--allow-unauth", StringComparison.OrdinalIgnoreCase)) { allowUnauth = true; }
+                else if (args[i].Equals("--confirm-perf", StringComparison.OrdinalIgnoreCase)) { confirmPerf = true; }
+                else if (i + 1 < args.Length && args[i].Equals("--username", StringComparison.OrdinalIgnoreCase)) { username = args[++i]; }
+                else if (i + 1 < args.Length && args[i].Equals("--password", StringComparison.OrdinalIgnoreCase)) { password = args[++i]; }
+                else if (i + 1 < args.Length && args[i].Equals("--output", StringComparison.OrdinalIgnoreCase)) { globalOutput = args[++i]; }
+            }
+
+            // safety guard: cap concurrency/duration unless confirmed
+            if (!confirmPerf)
+            {
+                if (concurrency > 50)
+                {
+                    concurrency = 50;
+                }
+                if (durationSec > 60)
+                {
+                    durationSec = 60;
+                }
+            }
+
+            return await RunPerfAsync(baseUrl, endpoint, concurrency, durationSec, username, password, allowUnauth, globalOutput);
         }
 
         return RunDataChecks(globalOutput);
@@ -309,6 +355,197 @@ class Checker
         }
 
         return failures.Count > 0 ? 3 : 0;
+    }
+
+    private static async Task<int> RunPerfAsync(
+        string baseUrl,
+        string endpoint,
+        int concurrency,
+        int durationSec,
+        string? username,
+        string? password,
+        bool allowUnauth,
+        string? outputPath)
+    {
+        Console.WriteLine($"Running performance test against {baseUrl}{endpoint} with concurrency={concurrency}, duration={durationSec}s");
+
+        // Configure HttpClient for high throughput
+        var handler = new SocketsHttpHandler
+        {
+            PooledConnectionIdleTimeout = TimeSpan.FromSeconds(30),
+            PooledConnectionLifetime = TimeSpan.FromMinutes(2),
+            MaxConnectionsPerServer = Math.Max(10, concurrency * 2)
+        };
+        using var http = new HttpClient(handler) { BaseAddress = new Uri(baseUrl), Timeout = TimeSpan.FromSeconds(15) };
+
+        // Optional auth
+        string? token = null;
+        if (!string.IsNullOrEmpty(username) && !string.IsNullOrEmpty(password))
+        {
+            try
+            {
+                var loginResp = await http.PostAsJsonAsync("/api/auth/login", new { Username = username, Password = password });
+                if (loginResp.IsSuccessStatusCode)
+                {
+                    var body = await loginResp.Content.ReadAsStringAsync();
+                    try
+                    {
+                        using var doc = System.Text.Json.JsonDocument.Parse(body);
+                        if (doc.RootElement.TryGetProperty("token", out var t1) && t1.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            token = t1.GetString();
+                        }
+                        else if (doc.RootElement.TryGetProperty("access_token", out var t2) && t2.ValueKind == System.Text.Json.JsonValueKind.String)
+                        {
+                            token = t2.GetString();
+                        }
+                    }
+                    catch { }
+                }
+                if (!string.IsNullOrEmpty(token))
+                {
+                    http.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", token);
+                }
+                else if (!allowUnauth)
+                {
+                    Console.WriteLine("Auth token not obtained and --allow-unauth not set; aborting perf test.");
+                    return 3;
+                }
+            }
+                catch (Exception ex)
+                {
+                    Console.WriteLine($"Auth attempt failed: {ex.Message}");
+                    if (!allowUnauth)
+                    {
+                        return 3;
+                    }
+                }
+        }
+
+        var cts = new System.Threading.CancellationTokenSource(TimeSpan.FromSeconds(durationSec));
+        var swTotal = Stopwatch.StartNew();
+        var latencies = new List<long>(capacity: Math.Min(200_000, concurrency * durationSec * 2));
+        var statusCounts = new Dictionary<int, int>();
+        int success = 0, errors = 0;
+
+        // simple worker that loops until cancellation
+        async Task Worker()
+        {
+            var rng = new Random();
+            while (!cts.IsCancellationRequested)
+            {
+                try
+                {
+                    var sw = Stopwatch.StartNew();
+                    using var resp = await http.GetAsync(endpoint, cts.Token);
+                    sw.Stop();
+                    lock (latencies) { latencies.Add(sw.ElapsedMilliseconds); }
+                    var code = (int)resp.StatusCode;
+                    lock (statusCounts) { statusCounts[code] = statusCounts.TryGetValue(code, out var n) ? n + 1 : 1; }
+                    if (resp.IsSuccessStatusCode)
+                    {
+                        System.Threading.Interlocked.Increment(ref success);
+                    }
+                    else
+                    {
+                        System.Threading.Interlocked.Increment(ref errors);
+                    }
+                }
+                catch (OperationCanceledException)
+                {
+                    // normal on cancellation
+                    break;
+                }
+                catch (Exception)
+                {
+                    System.Threading.Interlocked.Increment(ref errors);
+                }
+
+                // tiny jitter to avoid lockstep
+                await Task.Delay(rng.Next(1, 5));
+            }
+        }
+
+        var tasks = Enumerable.Range(0, Math.Max(1, concurrency)).Select(_ => Worker()).ToArray();
+        await Task.WhenAll(tasks);
+        swTotal.Stop();
+
+        // compute metrics
+        double seconds = Math.Max(0.001, swTotal.Elapsed.TotalSeconds);
+        int total = success + errors;
+        double rps = total / seconds;
+        long p50 = 0, p95 = 0, p99 = 0;
+        double avg = 0;
+        if (latencies.Count > 0)
+        {
+            latencies.Sort();
+            avg = latencies.Average();
+            p50 = Percentile(latencies, 50);
+            p95 = Percentile(latencies, 95);
+            p99 = Percentile(latencies, 99);
+        }
+
+        Console.WriteLine("\n=== Performance summary ===");
+        Console.WriteLine($"Total requests: {total} in {seconds:F1}s (RPS={rps:F1})");
+        Console.WriteLine($"Success: {success}, Errors: {errors}");
+        Console.WriteLine($"Latency ms -> avg: {avg:F1}, p50: {p50}, p95: {p95}, p99: {p99}");
+        Console.WriteLine("Status codes:");
+        foreach (var kv in statusCounts.OrderBy(k => k.Key))
+        {
+            Console.WriteLine($"  {kv.Key}: {kv.Value}");
+        }
+
+        if (!string.IsNullOrEmpty(outputPath))
+        {
+            var report = new
+            {
+                mode = "perf",
+                baseUrl,
+                endpoint,
+                concurrency,
+                durationSec,
+                totals = new { total, success, errors, rps },
+                latency = new { avgMs = avg, p50Ms = p50, p95Ms = p95, p99Ms = p99 },
+                status = statusCounts
+            };
+            try
+            {
+                System.IO.File.WriteAllText(outputPath, System.Text.Json.JsonSerializer.Serialize(report, new System.Text.Json.JsonSerializerOptions { WriteIndented = true }));
+                Console.WriteLine($"Wrote perf report to {outputPath}");
+            }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"Failed writing perf report: {ex.Message}");
+            }
+        }
+
+        // Consider any non-zero error count as non-zero exit (so CI can catch regressions)
+        return errors > 0 ? 4 : 0;
+    }
+
+    private static long Percentile(List<long> sortedValues, int percentile)
+    {
+        if (sortedValues.Count == 0)
+        {
+            return 0;
+        }
+        if (percentile <= 0)
+        {
+            return sortedValues[0];
+        }
+        if (percentile >= 100)
+        {
+            return sortedValues[^1];
+        }
+        var rank = (percentile / 100.0) * (sortedValues.Count - 1);
+        int low = (int)Math.Floor(rank);
+        int high = (int)Math.Ceiling(rank);
+        if (low == high)
+        {
+            return sortedValues[low];
+        }
+        double frac = rank - low;
+        return (long)Math.Round(sortedValues[low] + frac * (sortedValues[high] - sortedValues[low]));
     }
 
     private static bool HasAnyProperty(System.Text.Json.JsonElement el, string[] names)

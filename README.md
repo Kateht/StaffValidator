@@ -175,6 +175,27 @@ Modes:
 
 - Data-check (default): Reads `data/staff_records.json`, validates each record using `HybridValidatorService`, compares with automata, prints mismatches, writes report (if `--output`), and exits with code 0 (no mismatches) or 2 (mismatches present).
 - HTTP smoke-check: `--http-check <baseUrl>` runs a set of HTTP requests to verify the web app is up and returns expected results. Supports authentication via `--username` and `--password` (POST `/api/auth/login`) and writing a JSON report with `--output <file>`.
+- Performance test (safe stress): `--perf <baseUrl> [--endpoint /api/staff] [--concurrency 10] [--duration 30] [--username ... --password ...] [--output report.json] [--confirm-perf]`
+  - Sends concurrent GET requests to the specified endpoint for the given duration.
+  - Reports totals, RPS, and latency percentiles (avg, p50, p95, p99) and status code counts.
+  - Safety: by default caps `--concurrency` at 50 and `--duration` at 60s unless `--confirm-perf` is provided.
+
+Examples:
+
+```powershell
+# 30s perf run with concurrency 10 (default), endpoint /api/staff
+dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000
+
+# 45s perf run with concurrency 25 on /api/staff (requires --confirm-perf to exceed default caps)
+dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000 --endpoint /api/staff --concurrency 25 --duration 45 --confirm-perf
+
+# Authenticated perf run and write JSON report
+dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000 --username admin --password admin123 --output perf-report.json --confirm-perf
+```
+
+Notes:
+- Use only against environments you own and control. The perf mode is intended for safe stress within development/staging and includes conservative guardrails.
+- Consider enabling rate limiting at the app or reverse-proxy layer; observe HTTP 429/5xx under bursts.
 
 How the checker authenticates
 
@@ -188,6 +209,21 @@ Report format (example):
   "baseUrl": "http://localhost:5000",
   "authUsed": true,
   "failures": [ /* ... */ ]
+}
+```
+
+Performance report example (`--output perf-report.json`):
+
+```json
+{
+  "mode": "perf",
+  "baseUrl": "http://localhost:5000",
+  "endpoint": "/api/staff",
+  "concurrency": 10,
+  "durationSec": 30,
+  "totals": { "total": 1234, "success": 1230, "errors": 4, "rps": 41.1 },
+  "latency": { "avgMs": 20.4, "p50Ms": 18, "p95Ms": 40, "p99Ms": 60 },
+  "status": { "200": 1230, "500": 4 }
 }
 ```
 
