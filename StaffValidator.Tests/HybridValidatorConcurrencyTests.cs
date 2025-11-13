@@ -26,7 +26,10 @@ namespace StaffValidator.Tests
                 try
                 {
                     var msg = formatter != null ? formatter(state, exception) : state?.ToString();
-                    if (!string.IsNullOrEmpty(msg)) Messages.Add(msg);
+                    if (!string.IsNullOrEmpty(msg))
+                    {
+                        Messages.Add(msg);
+                    }
                 }
                 catch { }
             }
@@ -77,10 +80,9 @@ namespace StaffValidator.Tests
             var hasFallback = logger.Messages.Any(m => m.Contains("DFA fallback", StringComparison.OrdinalIgnoreCase));
 
             // Should see either concurrency limits OR timeout OR DFA fallback logs
-            Assert.True(hasConcurrency || hasTimeout || hasInvalid || hasFallback, 
+            Assert.True(hasConcurrency || hasTimeout || hasInvalid || hasFallback,
                 "Expected at least one fallback-related log (concurrency/timeout/invalid regex/DFA fallback) but none were found. Logs:\n" + combined);
 
-            // And validations should have completed (some or all may succeed via DFA fallback)
             Assert.Equal(20, results.Count);
         }
     }
