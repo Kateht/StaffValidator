@@ -1,3 +1,4 @@
+using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Net;
@@ -101,6 +102,88 @@ namespace StaffValidator.Tests
             Assert.Empty(inMemory.GetAll());
         }
 
+        [Fact]
+        public async Task Post_Create_WithInvalidPhone_ShowsValidationError_AndDoesNotAdd()
+        {
+            var inMemory = new InMemoryStaffRepository();
+
+            var factory = new TestWebApplicationFactory()
+                .WithWebHostBuilder(builder =>
+                {
+                    builder.ConfigureServices(services =>
+                    {
+                        services.RemoveAll<IStaffRepository>();
+                        services.AddSingleton<IStaffRepository>(_ => inMemory);
+                    });
+                });
+
+            var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+            var formData = new Dictionary<string, string>
+            {
+                ["StaffName"] = "Bad Phone User",
+                ["Email"] = "gooduser@example.com",
+                ["PhoneNumber"] = "invalid-phone-number",
+                ["StartingDate"] = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            };
+
+            var content = new FormUrlEncodedContent(formData);
+            var resp = await client.PostAsync("/Staff/Create", content);
+
+            // Controller should return the view with validation error (not redirect when invalid)
+            Assert.True(resp.StatusCode == HttpStatusCode.OK || resp.StatusCode == HttpStatusCode.Found);
+            var body = await resp.Content.ReadAsStringAsync();
+            
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                Assert.Contains("PhoneNumber: invalid format", body);
+            }
+
+            Assert.Empty(inMemory.GetAll());
+        }
+
+        [Fact]
+        public async Task Post_Create_WithBothInvalid_ShowsMultipleValidationErrors()
+        {
+            var inMemory = new InMemoryStaffRepository();
+
+            var factory = new TestWebApplicationFactory()
+                .WithWebHostBuilder(builder =>
+                {
+                    builder.ConfigureServices(services =>
+                    {
+                        services.RemoveAll<IStaffRepository>();
+                        services.AddSingleton<IStaffRepository>(_ => inMemory);
+                    });
+                });
+
+            var client = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false });
+
+            var formData = new Dictionary<string, string>
+            {
+                ["StaffName"] = "Both Invalid User",
+                ["Email"] = "not-an-email",
+                ["PhoneNumber"] = "not-a-phone",
+                ["StartingDate"] = DateTime.UtcNow.ToString("yyyy-MM-dd")
+            };
+
+            var content = new FormUrlEncodedContent(formData);
+            var resp = await client.PostAsync("/Staff/Create", content);
+
+            // Controller should return the view with validation error (not redirect when invalid)
+            Assert.True(resp.StatusCode == HttpStatusCode.OK || resp.StatusCode == HttpStatusCode.Found);
+            var body = await resp.Content.ReadAsStringAsync();
+            
+            if (resp.StatusCode == HttpStatusCode.OK)
+            {
+                // Both validations should fail
+                Assert.Contains("Email: invalid format", body);
+                Assert.Contains("PhoneNumber: invalid format", body);
+            }
+
+            Assert.Empty(inMemory.GetAll());
+        }
+
         private class InMemoryStaffRepository : IStaffRepository
         {
             private readonly List<Staff> _items = new();
@@ -118,7 +201,10 @@ namespace StaffValidator.Tests
             public void Update(Staff staff)
             {
                 var idx = _items.FindIndex(s => s.StaffID == staff.StaffID);
-                if (idx >= 0) _items[idx] = staff;
+                if (idx >= 0)
+                {
+                    _items[idx] = staff;
+                }
             }
 
             public void Delete(int id)

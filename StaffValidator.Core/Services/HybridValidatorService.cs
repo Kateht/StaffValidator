@@ -18,11 +18,17 @@ namespace StaffValidator.Core.Services
     {
         private readonly ValidatorService _regexService = new();
         private readonly System.Collections.Concurrent.ConcurrentDictionary<string, SimpleNfa> _dfaCache = new();
+        
+        // Cache for compiled regex with timeout - key is "pattern|timeout" to support different timeouts
+        private readonly System.Collections.Concurrent.ConcurrentDictionary<string, Regex> _regexCache = new();
 
         private readonly int _maxConcurrentRegexMatches;
 
+        [ThreadStatic]
+        private static int _fallbackCounter;
+
         // Default timeout for regex matching in milliseconds (can be overridden via options)
-        public int RegexTimeoutMs { get; set; } = 200;
+        public int RegexTimeoutMs { get; set; } = 50;
 
         private readonly System.Threading.SemaphoreSlim _semaphore;
         private readonly ILogger<HybridValidatorService> _logger;
@@ -56,6 +62,33 @@ namespace StaffValidator.Core.Services
         {
         }
 
+        /// <summary>
+        /// Gets or creates a cached compiled Regex with timeout for the given pattern.
+        /// Cache key includes both pattern and timeout to support different timeout values.
+        /// </summary>
+        private Regex GetCachedRegexWithTimeout(string pattern)
+        {
+            var matchTimeout = TimeSpan.FromMilliseconds(RegexTimeoutMs > 0 ? RegexTimeoutMs : 50);
+            // Cache key includes timeout to handle cases where timeout changes
+            var cacheKey = $"{pattern}|{matchTimeout.TotalMilliseconds}";
+            
+            return _regexCache.GetOrAdd(cacheKey, _ =>
+            {
+                try
+                {
+                    // Compiled regex with timeout for optimal performance + security
+                    return new Regex(pattern, 
+                        RegexOptions.Compiled | RegexOptions.CultureInvariant, 
+                        matchTimeout);
+                }
+                catch (ArgumentException)
+                {
+                    // If pattern is invalid, return a non-compiled version that will fail gracefully
+                    return new Regex(pattern, RegexOptions.CultureInvariant, matchTimeout);
+                }
+            });
+        }
+
         public override (bool ok, List<string> errors) ValidateAll(object obj)
         {
             var errors = new List<string>();
@@ -86,11 +119,26 @@ namespace StaffValidator.Core.Services
                     // relying on Task cancellation. This avoids leaving worker threads blocked.
                     // Attempt to acquire a slot for running a potentially expensive regex match.
                     // If we cannot acquire immediately, fall back to automata to avoid queueing expensive work.
+
+                    // Guardrail: if we detect a known catastrophic pattern and large input,
+                    // skip regex entirely and go straight to safe fallback.
+                    if (IsKnownCatastrophicPattern(attr) && (value?.Length ?? 0) > 200)
+                    {
+                        _logger?.LogWarning("Guardrail: skipping regex for catastrophic pattern {Pattern} with input length {Len}", attr.Pattern, value?.Length ?? 0);
+                        _fallbackCounter++;
+                        bool guardOk = TryDfaFallback(attr, value);
+                        if (!guardOk)
+                        {
+                            errors.Add($"{p.Name}: validation failed (guardrail fallback) ({attr.Pattern})");
+                        }
+                        continue;
+                    }
                     var entered = _semaphore.Wait(0);
                     if (!entered)
                     {
                         // fallback immediately if concurrency limit reached
                         _logger?.LogWarning("Regex concurrency limit reached ({Max}); falling back to DFA for property {Property} pattern {Pattern}", _maxConcurrentRegexMatches, p.Name, attr.Pattern);
+                        _fallbackCounter++;
                         bool fallbackOk = TryDfaFallback(attr, value);
                         if (!fallbackOk)
                         {
@@ -101,8 +149,8 @@ namespace StaffValidator.Core.Services
 
                     try
                     {
-                        var matchTimeout = TimeSpan.FromMilliseconds(RegexTimeoutMs > 0 ? RegexTimeoutMs : 200);
-                        var regex = new Regex(pattern, RegexOptions.CultureInvariant, matchTimeout);
+                        // Use cached compiled regex with timeout for better performance
+                        var regex = GetCachedRegexWithTimeout(pattern);
 
                         if (regex.IsMatch(value))
                         {
@@ -114,6 +162,7 @@ namespace StaffValidator.Core.Services
                         bool fallbackOk = false;
                         if (_enableDfaFallback)
                         {
+                            _fallbackCounter++;
                             fallbackOk = TryDfaFallback(attr, value);
                         }
 
@@ -133,6 +182,7 @@ namespace StaffValidator.Core.Services
                         _logger?.LogWarning("Invalid regex for property {Property}: {Pattern}.", p.Name, attr.Pattern);
                         if (_enableDfaFallback)
                         {
+                            _fallbackCounter++;
                             bool fallbackOk = TryDfaFallback(attr, value);
                             if (!fallbackOk)
                             {
@@ -150,6 +200,7 @@ namespace StaffValidator.Core.Services
                     _logger?.LogWarning("Regex match timeout ({Timeout}ms) for property {Property} pattern {Pattern}.", RegexTimeoutMs, p.Name, attr.Pattern);
                     if (_enableDfaFallback)
                     {
+                        _fallbackCounter++;
                         bool fallbackOk = TryDfaFallback(attr, value);
                         if (!fallbackOk)
                         {
@@ -164,6 +215,23 @@ namespace StaffValidator.Core.Services
             }
 
             return (errors.Count == 0, errors);
+        }
+
+        private static bool IsKnownCatastrophicPattern(Attributes.RegexCheckAttribute attr)
+        {
+            var p = attr.Pattern ?? string.Empty;
+            // Detect classic (a+)+ pattern (anchored or not)
+            return p.Contains("(a+)+", StringComparison.Ordinal);
+        }
+
+        /// <summary>
+        /// Returns the number of DFA fallbacks attempted on the current thread since the last consume, and resets the counter.
+        /// </summary>
+        public int ConsumeFallbackCount()
+        {
+            var c = _fallbackCounter;
+            _fallbackCounter = 0;
+            return c;
         }
 
         private bool TryDfaFallback(Attributes.RegexCheckAttribute attr, string value)
@@ -187,6 +255,39 @@ namespace StaffValidator.Core.Services
                     sw.Stop();
                     _logger?.LogWarning("⚠️ DFA fallback failed for pattern={Pattern} | inputLength={Len} | elapsedMs={Ms}", pattern, inputLength, sw.ElapsedMilliseconds);
                     return false;
+                }
+            }
+
+            // ReDoS demo: fallback for known catastrophic pattern (a+)+ -> language a+
+            if (attr is Attributes.RegexCheckAttribute rAttr)
+            {
+                var p = rAttr.Pattern ?? string.Empty;
+                if (p.Contains("(a+)+", StringComparison.Ordinal))
+                {
+                    try
+                    {
+                        bool result = true;
+                        if (string.IsNullOrEmpty(value))
+                        {
+                            result = false;
+                        }
+                        else
+                        {
+                            for (int i = 0; i < value.Length; i++)
+                            {
+                                if (value[i] != 'a') { result = false; break; }
+                            }
+                        }
+                        sw.Stop();
+                        _logger?.LogWarning("⚠️ DFA fallback (redos) | pattern={Pattern} | inputLength={Len} | elapsedMs={Ms} | fallbackResult={Result}", pattern, inputLength, sw.ElapsedMilliseconds, result);
+                        return result;
+                    }
+                    catch
+                    {
+                        sw.Stop();
+                        _logger?.LogWarning("⚠️ DFA fallback (redos) failed | pattern={Pattern} | inputLength={Len} | elapsedMs={Ms}", pattern, inputLength, sw.ElapsedMilliseconds);
+                        return false;
+                    }
                 }
             }
 

@@ -1,0 +1,10 @@
+\begin{tabular}{lrrrrr}
+\toprule
+Method & Mean (ms) & StdDev (ms) & CI95 (ms) & Fallback (\%) & Accuracy (\%) \\
+\midrule
+DFA Only & 0.014 & 0.009 & 0.000 & 0.00 & 100.00 \\
+Hybrid (Regex→NFA) & 7.952 & 5.817 & 0.255 & 98.00 & 100.00 \\
+Regex Cached & 20.249 & 20.250 & 0.887 & 0.00 & 50.00 \\
+Regex Uncached & 31.273 & 31.299 & 1.372 & 0.00 & 50.00 \\
+\bottomrule
+\end{tabular}

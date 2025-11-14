@@ -10,7 +10,7 @@ namespace StaffValidator.Core.Services
         /// Timeout in milliseconds to apply to Regex matches before falling back to automata.
         /// Defaults to 200 ms.
         /// </summary>
-        public int RegexTimeoutMs { get; set; } = 200;
+        public int RegexTimeoutMs { get; set; } = 50;
         /// <summary>
         /// Maximum number of concurrent regex match operations allowed. If exceeded, the
         /// validator will fall back to automata for safety instead of queuing additional regex work.

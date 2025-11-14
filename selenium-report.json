@@ -1,0 +1,213 @@
+{
+  "mode": "selenium-ui-check",
+  "baseUrl": "http://localhost:5000",
+  "browser": "chrome",
+  "headless": false,
+  "timeoutSec": 20,
+  "username": "(provided)",
+  "failures": [],
+  "cases": [
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 01",
+      "Email": "user@example.com",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 02",
+      "Email": "user.name\u002Btag@example.co.uk",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 03",
+      "Email": "u@ex.io",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 04",
+      "Email": "first_last@example-domain.com",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 05",
+      "Email": "user..dot@example.com",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Validation errors present on Create page"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 06",
+      "Email": "user@sub_domain.com",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Validation errors present on Create page"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 07",
+      "Email": "user@example",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Submission did not navigate; likely blocked by client validation"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 08",
+      "Email": "@example.com",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Submission did not navigate; likely blocked by client validation"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 09",
+      "Email": "user@example.c",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Validation errors present on Create page"
+    },
+    {
+      "Type": "email",
+      "Name": "Selenium EmailCase 10",
+      "Email": "user@-example.com",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 01",
+      "Email": "user@example.com",
+      "Phone": "0123456789",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 02",
+      "Email": "user@example.com",
+      "Phone": "\u002B84 901 234 567",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 03",
+      "Email": "user@example.com",
+      "Phone": "(021) 234-5678",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 04",
+      "Email": "user@example.com",
+      "Phone": "123-456",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 05",
+      "Email": "user@example.com",
+      "Phone": "\u002B1 (555) 123-4567",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 06",
+      "Email": "user@example.com",
+      "Phone": "\u002B\u002B1 555 1234",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Validation errors present on Create page"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 07",
+      "Email": "user@example.com",
+      "Phone": "12",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Validation errors present on Create page"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 08",
+      "Email": "user@example.com",
+      "Phone": "abcdefghij",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Validation errors present on Create page"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 09",
+      "Email": "user@example.com",
+      "Phone": "\u002B123 456 789 012 345 678 9",
+      "ExpectedValid": false,
+      "ObservedValid": false,
+      "Pass": true,
+      "Details": "Validation errors present on Create page"
+    },
+    {
+      "Type": "phone",
+      "Name": "Selenium PhoneCase 10",
+      "Email": "user@example.com",
+      "Phone": "\u002B49-30-123456",
+      "ExpectedValid": true,
+      "ObservedValid": true,
+      "Pass": true,
+      "Details": "Redirected away from Create (treated as success)"
+    }
+  ],
+  "delayMs": 500,
+  "success": true
+}

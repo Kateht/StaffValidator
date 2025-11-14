@@ -67,14 +67,22 @@ namespace StaffValidator.Core.Services
             {
                 // exact char transitions
                 if (s.Transitions.TryGetValue(ch, out var list))
-                    foreach (var t in list) res.Add(t);
+                {
+                    foreach (var t in list)
+                    {
+                        res.Add(t);
+                    }
+                }
 
                 // wildcard any-non-space sentinel using char key '\u0000'
                 if (s.Transitions.TryGetValue('\u0000', out var wild))
                 {
                     if (!char.IsWhiteSpace(ch))
                     {
-                        foreach (var t in wild) res.Add(t);
+                        foreach (var t in wild)
+                        {
+                            res.Add(t);
+                        }
                     }
                 }
 
@@ -82,7 +90,12 @@ namespace StaffValidator.Core.Services
                 if (s.Transitions.TryGetValue('\u0001', out var digs))
                 {
                     if (char.IsDigit(ch))
-                        foreach (var t in digs) res.Add(t);
+                    {
+                        foreach (var t in digs)
+                        {
+                            res.Add(t);
+                        }
+                    }
                 }
             }
             return res;
@@ -95,7 +108,10 @@ namespace StaffValidator.Core.Services
             {
                 var moved = Move(current, ch);
                 current = EpsilonClosure(moved);
-                if (current.Count == 0) return false;
+                if (current.Count == 0)
+                {
+                    return false;
+                }
             }
             return current.Any(s => s.IsAccept);
         }

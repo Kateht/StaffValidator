@@ -6,6 +6,9 @@ using Serilog.Events;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.IdentityModel.Tokens;
 using System.Text;
+using Microsoft.EntityFrameworkCore;
+using StaffValidator.WebApp.Data;
+using StaffValidator.WebApp.Repositories;
 
 // Configure Serilog early in the application lifecycle
 Log.Logger = new LoggerConfiguration()
@@ -82,17 +85,44 @@ try
         });
     });
     
-    // Configure JSON Repository with sample data
-    builder.Services.Configure<StaffRepositoryOptions>(builder.Configuration.GetSection("Data"));
-    builder.Services.AddSingleton<IStaffRepository>(sp =>
-        new StaffRepository(sp.GetRequiredService<IOptions<StaffRepositoryOptions>>()));
+    // Data layer: choose DB (SQLite) or fallback to JSON file based on config
+    var dataSection = builder.Configuration.GetSection("Data");
+    var useDb = dataSection.GetValue<bool>("UseDatabase");
+    var provider = dataSection.GetValue<string>("Provider") ?? "sqlite";
+    var connStr = dataSection.GetValue<string>("ConnectionString") ?? "Data Source=staff.db";
+
+    if (useDb)
+    {
+        if (provider.Equals("sqlite", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddDbContext<StaffDbContext>(options => options.UseSqlite(connStr));
+        }
+        else if (provider.Equals("sqlserver", StringComparison.OrdinalIgnoreCase))
+        {
+            builder.Services.AddDbContext<StaffDbContext>(options => options.UseSqlServer(connStr));
+        }
+        else
+        {
+            throw new InvalidOperationException($"Unsupported Data.Provider '{provider}'. Use 'sqlite' or 'sqlserver'.");
+        }
+
+        builder.Services.AddScoped<IStaffRepository, EfStaffRepository>();
+    }
+    else
+    {
+        // JSON repository fallback
+        builder.Services.Configure<StaffRepositoryOptions>(dataSection);
+        builder.Services.AddSingleton<IStaffRepository>(sp =>
+            new StaffRepository(sp.GetRequiredService<IOptions<StaffRepositoryOptions>>()));
+    }
     
     // Register application services
     // Configure HybridValidation options from configuration
     builder.Services.Configure<HybridValidationOptions>(builder.Configuration.GetSection("HybridValidation"));
 
-    // Use the HybridValidatorService as the concrete implementation for ValidatorService
-    builder.Services.AddSingleton<ValidatorService, HybridValidatorService>();
+    // Register HybridValidatorService as singleton (for both base and concrete type)
+    builder.Services.AddSingleton<HybridValidatorService>();
+    builder.Services.AddSingleton<ValidatorService>(sp => sp.GetRequiredService<HybridValidatorService>());
     builder.Services.AddScoped<IAuthenticationService, AuthenticationService>();
 
     // Configure JWT Authentication
@@ -183,6 +213,38 @@ try
     app.UseAuthentication();
     app.UseAuthorization();
     
+    // Ensure database exists and import from JSON on first run if empty
+    if (useDb)
+    {
+        using var scope = app.Services.CreateScope();
+        var db = scope.ServiceProvider.GetRequiredService<StaffDbContext>();
+        // For now, EnsureCreated to keep zero-migration setup working for both SQLite/SQL Server
+        db.Database.EnsureCreated();
+
+        try
+        {
+            if (!db.Staff.Any())
+            {
+                var jsonPath = dataSection.GetValue<string>("JsonPath") ?? "data/staff_records.json";
+                if (System.IO.File.Exists(jsonPath))
+                {
+                    var json = System.IO.File.ReadAllText(jsonPath);
+                    var items = System.Text.Json.JsonSerializer.Deserialize<List<StaffValidator.Core.Models.Staff>>(json) ?? new();
+                    if (items.Count > 0)
+                    {
+                        db.Staff.AddRange(items);
+                        db.SaveChanges();
+                        Log.Information("Imported {Count} staff records from JSON into database", items.Count);
+                    }
+                }
+            }
+        }
+        catch (Exception importEx)
+        {
+            Log.Warning(importEx, "Failed to import seed data into database");
+        }
+    }
+
     app.MapControllerRoute(
         name: "default",
         pattern: "{controller=Staff}/{action=Index}/{id?}");

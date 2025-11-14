@@ -12,15 +12,16 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ INTERFACE LAYER (Presentation)                      │  ← Yêu cầu 2
-│ - MVC Views (Razor)                                  │
+│ INTERFACE LAYER (Presentation)                      │  
+│ - MVC Views (Razor)                                 │
 │ - Controllers (StaffController, AuthController)     │
 │ - HTTP Endpoints (/, /Staff, /Staff/Create, etc.)   │
 │ - Forms & Client-side validation                    │
+│ - UI checker by Selenium                            │
 └─────────────────────────────────────────────────────┘
                       ↕
 ┌─────────────────────────────────────────────────────┐
-│ INTERMEDIARY LAYER (Business Logic)                 │  ← Yêu cầu 1
+│ INTERMEDIARY LAYER (Business Logic)                 │  
 │ - ValidatorService (Regex-based validation)         │
 │ - HybridValidatorService (Regex + NFA fallback)     │
 │ - AuthenticationService (JWT + BCrypt)              │
@@ -30,9 +31,9 @@
 └─────────────────────────────────────────────────────┘
                       ↕
 ┌─────────────────────────────────────────────────────┐
-│ DATA LAYER                                           │
+│ DATA LAYER                                          │
 │ - staff_records.json (File-based storage)           │
-│ - Staff Models                                       │
+│ - Staff Models                                      │
 └─────────────────────────────────────────────────────┘
 ```
 

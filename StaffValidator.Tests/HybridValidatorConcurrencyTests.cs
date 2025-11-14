@@ -26,7 +26,10 @@ namespace StaffValidator.Tests
                 try
                 {
                     var msg = formatter != null ? formatter(state, exception) : state?.ToString();
-                    if (!string.IsNullOrEmpty(msg)) Messages.Add(msg);
+                    if (!string.IsNullOrEmpty(msg))
+                    {
+                        Messages.Add(msg);
+                    }
                 }
                 catch { }
             }
