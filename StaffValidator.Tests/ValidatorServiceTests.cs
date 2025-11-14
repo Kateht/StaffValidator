@@ -63,5 +63,26 @@ namespace StaffValidator.Tests
             Assert.False(ok);
             Assert.Contains(errors, e => e.Contains("PhoneNumber:") || e.Contains("Phone:"));
         }
+
+        [Fact]
+        public void ValidateAll_ReturnsFalse_ForBothInvalid()
+        {
+            var s = new Staff
+            {
+                StaffID = 4,
+                StaffName = "Charlie",
+                Email = "not-an-email",
+                PhoneNumber = "not-a-phone",
+                StartingDate = DateTime.UtcNow
+            };
+
+            var v = new ValidatorService();
+            var (ok, errors) = v.ValidateAll(s);
+
+            Assert.False(ok);
+            Assert.Contains(errors, e => e.Contains("Email:"));
+            Assert.Contains(errors, e => e.Contains("PhoneNumber:") || e.Contains("Phone:"));
+            Assert.True(errors.Count >= 2); // Both should fail
+        }
     }
 }

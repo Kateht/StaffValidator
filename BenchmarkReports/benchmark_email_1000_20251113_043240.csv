@@ -1,0 +1,5 @@
+﻿Method,AvgMs,StdDevMs,MinMs,MaxMs,FallbackPct,AccuracyPct,Samples,Success,Failures
+Regex Uncached,0.0141,0.0491,0.0085,1.4883,0,100,1000,600,400
+Regex Cached,0.0039,0.1141,0.0002,3.6102,0,100,1000,600,400
+Hybrid (Regex→DFA),1.7156,2.1148,0.0014,13.306,0,100,1000,679,321
+DFA Only,0.0089,0.0027,0.0035,0.0546,0,100,1000,679,321

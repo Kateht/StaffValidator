@@ -15,6 +15,21 @@ namespace StaffValidator.Tests
             public string Email { get; set; } = string.Empty;
         }
 
+        private class PhoneModel
+        {
+            [PhoneCheck(@"^\+?[0-9\s\-]{6,15}$")]
+            public string PhoneNumber { get; set; } = string.Empty;
+        }
+
+        private class EmailAndPhoneModel
+        {
+            [EmailCheck("\\S+@\\S+\\.\\S+")]
+            public string Email { get; set; } = string.Empty;
+
+            [PhoneCheck(@"^\+?[0-9\s\-]{6,15}$")]
+            public string PhoneNumber { get; set; } = string.Empty;
+        }
+
         private class CatastrophicModel
         {
             // pattern that can cause catastrophic backtracking: (a+)+b
@@ -33,6 +48,89 @@ namespace StaffValidator.Tests
             var (ok, errors) = svc.ValidateAll(model);
             Assert.True(ok);
             Assert.Empty(errors);
+        }
+
+        [Fact]
+        public void ValidPhone_Passes()
+        {
+            var opts = Options.Create(new HybridValidationOptions { RegexTimeoutMs = 200, EnableDfaFallback = true });
+            var logger = NullLogger<HybridValidatorService>.Instance;
+            var svc = new HybridValidatorService(opts, logger);
+
+            var model = new PhoneModel { PhoneNumber = "+44 7000 000000" };
+            var (ok, errors) = svc.ValidateAll(model);
+            Assert.True(ok);
+            Assert.Empty(errors);
+        }
+
+        [Fact]
+        public void BothEmailAndPhone_ValidInput_Passes()
+        {
+            var opts = Options.Create(new HybridValidationOptions { RegexTimeoutMs = 200, EnableDfaFallback = true });
+            var logger = NullLogger<HybridValidatorService>.Instance;
+            var svc = new HybridValidatorService(opts, logger);
+
+            var model = new EmailAndPhoneModel 
+            { 
+                Email = "test@example.com",
+                PhoneNumber = "+1 555 1234567"
+            };
+            var (ok, errors) = svc.ValidateAll(model);
+            Assert.True(ok);
+            Assert.Empty(errors);
+        }
+
+        [Fact]
+        public void BothEmailAndPhone_InvalidEmail_Fails()
+        {
+            var opts = Options.Create(new HybridValidationOptions { RegexTimeoutMs = 200, EnableDfaFallback = true });
+            var logger = NullLogger<HybridValidatorService>.Instance;
+            var svc = new HybridValidatorService(opts, logger);
+
+            var model = new EmailAndPhoneModel 
+            { 
+                Email = "not-an-email",
+                PhoneNumber = "+1 555 1234567"
+            };
+            var (ok, errors) = svc.ValidateAll(model);
+            Assert.False(ok);
+            Assert.Contains(errors, e => e.Contains("Email"));
+        }
+
+        [Fact]
+        public void BothEmailAndPhone_InvalidPhone_Fails()
+        {
+            var opts = Options.Create(new HybridValidationOptions { RegexTimeoutMs = 200, EnableDfaFallback = true });
+            var logger = NullLogger<HybridValidatorService>.Instance;
+            var svc = new HybridValidatorService(opts, logger);
+
+            var model = new EmailAndPhoneModel 
+            { 
+                Email = "valid@example.com",
+                PhoneNumber = "invalid-phone"
+            };
+            var (ok, errors) = svc.ValidateAll(model);
+            Assert.False(ok);
+            Assert.Contains(errors, e => e.Contains("Phone"));
+        }
+
+        [Fact]
+        public void BothEmailAndPhone_BothInvalid_Fails()
+        {
+            var opts = Options.Create(new HybridValidationOptions { RegexTimeoutMs = 200, EnableDfaFallback = true });
+            var logger = NullLogger<HybridValidatorService>.Instance;
+            var svc = new HybridValidatorService(opts, logger);
+
+            var model = new EmailAndPhoneModel 
+            { 
+                Email = "not-an-email",
+                PhoneNumber = "not-a-phone"
+            };
+            var (ok, errors) = svc.ValidateAll(model);
+            Assert.False(ok);
+            Assert.Contains(errors, e => e.Contains("Email"));
+            Assert.Contains(errors, e => e.Contains("Phone"));
+            Assert.Equal(2, errors.Count); // Both should fail
         }
 
         [Fact]

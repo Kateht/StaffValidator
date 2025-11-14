@@ -359,6 +359,9 @@ Please follow the repository contribution flow: branch per feature, add tests, u
 
 This project is MIT licensed — see the `LICENSE` file.
 
+
+## Selenium test
+dotnet run --project "StaffValidator.Checker" -- --selenium-ui-check http://localhost:5000 --browser chrome --no-headless --timeout 20 --username admin --password admin123 --delay-ms 500 --output .\selenium-report.json
 ---
 
 
