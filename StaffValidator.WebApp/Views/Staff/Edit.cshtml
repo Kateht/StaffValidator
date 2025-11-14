@@ -40,6 +40,7 @@
 
                 <form asp-action="Edit" method="post" enctype="multipart/form-data" id="staffEditForm">
                     <input asp-for="StaffID" type="hidden" />
+                    <input type="hidden" name="removeExistingPhoto" id="removeExistingPhoto" value="false" />
                     
                     <div class="row">
                         <!-- Left Column -->
@@ -143,6 +144,9 @@ document.addEventListener('DOMContentLoaded', function() {
     photoInput.addEventListener('change', function(e) {
         const file = e.target.files[0];
         if (file) {
+            // if a new file is chosen, ensure we don't remove existing photo on server
+            const removeFlag = document.getElementById('removeExistingPhoto');
+            if (removeFlag) removeFlag.value = 'false';
             // Validate file size (5MB)
             if (file.size > 5 * 1024 * 1024) {
                 alert('File size must be less than 5MB');
@@ -167,6 +171,8 @@ document.addEventListener('DOMContentLoaded', function() {
         photoPlaceholder.style.display = 'block';
         photoPreview.style.display = 'none';
         previewImage.src = '';
+        const removeFlag = document.getElementById('removeExistingPhoto');
+        if (removeFlag) removeFlag.value = 'true';
     };
 
     // Form validation (same as Create form)

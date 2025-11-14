@@ -108,7 +108,7 @@ namespace StaffValidator.WebApp.Controllers
         }
 
         [HttpPost]
-        public IActionResult Edit(Staff model, IFormFile? photo)
+        public IActionResult Edit(Staff model, IFormFile? photo, bool removeExistingPhoto = false)
         {
             if (!ModelState.IsValid)
             {
@@ -125,6 +125,13 @@ namespace StaffValidator.WebApp.Controllers
                     return RedirectToAction("Index");
                 }
 
+                // Remove existing photo if requested
+                if (removeExistingPhoto && !string.IsNullOrEmpty(existingStaff.PhotoPath))
+                {
+                    TryDeletePhoto(existingStaff.PhotoPath);
+                    existingStaff.PhotoPath = string.Empty;
+                }
+
                 // Handle photo upload
                 if (photo != null && photo.Length > 0)
                 {
@@ -138,8 +145,7 @@ namespace StaffValidator.WebApp.Controllers
                     // Delete old photo if exists
                     if (!string.IsNullOrEmpty(existingStaff.PhotoPath))
                     {
-                        var oldPhysical = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), existingStaff.PhotoPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
-                        try { if (System.IO.File.Exists(oldPhysical)) System.IO.File.Delete(oldPhysical); } catch { }
+                        TryDeletePhoto(existingStaff.PhotoPath);
                     }
 
                     model.PhotoPath = relativePath;
@@ -182,12 +188,7 @@ namespace StaffValidator.WebApp.Controllers
                 // Delete photo if exists
                 if (!string.IsNullOrEmpty(staff.PhotoPath))
                 {
-                    var photoPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", staff.PhotoPath.TrimStart('/'));
-                    if (System.IO.File.Exists(photoPath))
-                    {
-                        System.IO.File.Delete(photoPath);
-                        _logger.LogInformation("🗑️ Photo deleted: {PhotoPath}", staff.PhotoPath);
-                    }
+                    TryDeletePhoto(staff.PhotoPath);
                 }
 
                 _repo.Delete(id);
@@ -350,6 +351,36 @@ namespace StaffValidator.WebApp.Controllers
         {
             ".jpg", ".jpeg", ".png", ".gif", ".webp"
         };
+
+        private string GetWebRoot()
+        {
+            return _env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+        }
+
+        private string? TryGetPhysicalPhotoPath(string? relative)
+        {
+            if (string.IsNullOrWhiteSpace(relative)) return null;
+            var trimmed = relative.TrimStart('/', '\\');
+            var normalized = trimmed.Replace('/', Path.DirectorySeparatorChar).Replace('\\', Path.DirectorySeparatorChar);
+            return Path.Combine(GetWebRoot(), normalized);
+        }
+
+        private void TryDeletePhoto(string? relative)
+        {
+            try
+            {
+                var physical = TryGetPhysicalPhotoPath(relative);
+                if (physical != null && System.IO.File.Exists(physical))
+                {
+                    System.IO.File.Delete(physical);
+                    _logger.LogInformation("🗑️ Photo deleted: {PhotoPath}", relative);
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "Failed to delete photo: {PhotoPath}", relative);
+            }
+        }
 
         private bool TrySavePhoto(IFormFile file, out string relativePath, out string error)
         {
