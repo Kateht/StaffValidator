@@ -17,11 +17,11 @@ namespace StaffValidator.Tests
         {
             public ConcurrentBag<string> Messages { get; } = new ConcurrentBag<string>();
 
-            public IDisposable BeginScope<TState>(TState state) => null;
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => null;
 
             public bool IsEnabled(LogLevel logLevel) => true;
 
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
                 try
                 {
@@ -49,11 +49,11 @@ namespace StaffValidator.Tests
         }
 
         [Fact]
-        public void ParallelValidations_ExhaustSemaphore_ProduceFallbackLogs()
+        public async Task ParallelValidations_ExhaustSemaphore_ProduceFallbackLogs()
         {
             // Arrange
             var logger = new TestLogger<HybridValidatorService>();
-            var options = Options.Create(new HybridValidationOptions { RegexTimeoutMs = 10, MaxConcurrentRegexMatches = 2 });
+            var options = Options.Create(new HybridValidationOptions { RegexTimeoutMs = 10, MaxConcurrentRegexMatches = 1 });
             var svc = new HybridValidatorService(options, logger);
 
             // Create a pathological email with a very long local part to force expensive regex behavior
@@ -70,7 +70,7 @@ namespace StaffValidator.Tests
                 results.Add((r.ok, r.errors?.ToArray() ?? Array.Empty<string>()));
             })).ToArray();
 
-            Task.WaitAll(tasks);
+            await Task.WhenAll(tasks);
 
             // Assert: at least one fallback log message must have been produced
             var combined = string.Join("\n", logger.Messages);

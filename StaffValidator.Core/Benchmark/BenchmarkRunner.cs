@@ -99,7 +99,7 @@ namespace StaffValidator.Core.Benchmark
             return summary;
         }
 
-        private async Task<BenchmarkResult> BenchmarkRegexUncached(List<string> dataset, string pattern, List<bool> expected)
+        private Task<BenchmarkResult> BenchmarkRegexUncached(List<string> dataset, string pattern, List<bool> expected)
         {
             var times = new List<double>();
             int successCount = 0;
@@ -127,10 +127,10 @@ namespace StaffValidator.Core.Benchmark
                 times.Add(sw.Elapsed.TotalMilliseconds);
             }
 
-            return CalculateResult("Regex Uncached", times, successCount, dataset.Count, 0, pattern, correctCount);
+            return Task.FromResult(CalculateResult("Regex Uncached", times, successCount, dataset.Count, 0, pattern, correctCount));
         }
 
-        private async Task<BenchmarkResult> BenchmarkRegexCached(List<string> dataset, string pattern, List<bool> expected)
+        private Task<BenchmarkResult> BenchmarkRegexCached(List<string> dataset, string pattern, List<bool> expected)
         {
             var times = new List<double>();
             int successCount = 0;
@@ -167,7 +167,7 @@ namespace StaffValidator.Core.Benchmark
                 times.Add(sw.Elapsed.TotalMilliseconds);
             }
 
-            return CalculateResult("Regex Cached", times, successCount, dataset.Count, 0, pattern, correctCount);
+            return Task.FromResult(CalculateResult("Regex Cached", times, successCount, dataset.Count, 0, pattern, correctCount));
         }
 
         private async Task<BenchmarkResult> BenchmarkHybrid(
@@ -198,13 +198,13 @@ namespace StaffValidator.Core.Benchmark
                     hybridService.ConsumeFallbackCount();
                     var (isValid, errors) = hybridService.ValidateAll(testModel);
                     fallbackCount += hybridService.ConsumeFallbackCount();
-                    
+
                     successCount += isValid ? 1 : 0;
                     if (expected.Count > 0)
                     {
                         if (isValid == expected[times.Count]) correctCount++;
                     }
-                    
+
                     // Check if fallback was used (look for warning in errors or log)
                     // Note: This is simplified - in production you'd track this via metrics
                 }
@@ -221,7 +221,7 @@ namespace StaffValidator.Core.Benchmark
             return CalculateResult("Hybrid (Regex→DFA)", times, successCount, dataset.Count, fallbackCount, GetPatternForType(type), correctCount);
         }
 
-        private async Task<BenchmarkResult> BenchmarkDfaOnly(List<string> dataset, string type, List<bool> expected)
+        private Task<BenchmarkResult> BenchmarkDfaOnly(List<string> dataset, string type, List<bool> expected)
         {
             var times = new List<double>();
             int successCount = 0;
@@ -276,7 +276,7 @@ namespace StaffValidator.Core.Benchmark
                 times.Add(sw.Elapsed.TotalMilliseconds);
             }
 
-            return CalculateResult("DFA Only", times, successCount, dataset.Count, 0, GetPatternForType(type), correctCount);
+            return Task.FromResult(CalculateResult("DFA Only", times, successCount, dataset.Count, 0, GetPatternForType(type), correctCount));
         }
 
         private BenchmarkResult CalculateResult(

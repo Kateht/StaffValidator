@@ -22,13 +22,11 @@ namespace StaffValidator.Core.Services
 
         private readonly int _maxConcurrentRegexMatches;
 
-        // Default timeout for regex matching in milliseconds 
+        // Default timeout for regex matching in milliseconds (can be overridden via options)
         public int RegexTimeoutMs { get; set; } = 200;
+
         [ThreadStatic]
         private static int _fallbackCounter;
-
-        // Default timeout for regex matching in milliseconds (can be overridden via options)
-        public int RegexTimeoutMs { get; set; } = 50;
 
         private readonly System.Threading.SemaphoreSlim _semaphore;
         private readonly ILogger<HybridValidatorService> _logger;
@@ -122,9 +120,9 @@ namespace StaffValidator.Core.Services
 
                     // Guardrail: if we detect a known catastrophic pattern and large input,
                     // skip regex entirely and go straight to safe fallback.
-                    if (IsKnownCatastrophicPattern(attr) && (value?.Length ?? 0) > 200)
+                    if (IsKnownCatastrophicPattern(attr) && value.Length > 200)
                     {
-                        _logger?.LogWarning("Guardrail: skipping regex for catastrophic pattern {Pattern} with input length {Len}", attr.Pattern, value?.Length ?? 0);
+                        _logger?.LogWarning("Guardrail: skipping regex for catastrophic pattern {Pattern} with input length {Len}", attr.Pattern, value.Length);
                         _fallbackCounter++;
                         bool guardOk = TryDfaFallback(attr, value);
                         if (!guardOk)
@@ -182,21 +180,14 @@ namespace StaffValidator.Core.Services
                     _logger?.LogWarning("Invalid regex for property {Property}: {Pattern}.", p.Name, attr.Pattern);
                     if (_enableDfaFallback)
                     {
+                        _fallbackCounter++;
                         bool fallbackOk = TryDfaFallback(attr, value);
                         if (!fallbackOk)
                         {
+                            // Fallback also failed – surface an error to the caller
                             errors.Add($"{p.Name}: invalid regex/format ({attr.Pattern})");
-                            _fallbackCounter++;
-                            bool fallbackOk = TryDfaFallback(attr, value);
-                            if (!fallbackOk)
-                            {
-                                errors.Add($"{p.Name}: invalid regex/format ({attr.Pattern})");
-                            }
                         }
-                        else
-                        {
-                            errors.Add($"{p.Name}: invalid regex ({attr.Pattern})");
-                        }
+                        // If fallback succeeded, treat as valid and do not add an error
                     }
                     else
                     {

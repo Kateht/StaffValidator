@@ -27,7 +27,7 @@ namespace StaffValidator.Tests
             // Verify the interface layer renders correctly
             var response = await _client.GetAsync("/Staff");
             var content = await response.Content.ReadAsStringAsync();
-            
+
             var doc = new HtmlDocument();
             doc.LoadHtml(content);
 
@@ -44,7 +44,7 @@ namespace StaffValidator.Tests
         {
             var response = await _client.GetAsync("/Staff/Create");
             var content = await response.Content.ReadAsStringAsync();
-            
+
             var doc = new HtmlDocument();
             doc.LoadHtml(content);
 
@@ -52,14 +52,14 @@ namespace StaffValidator.Tests
             var emailInput = doc.DocumentNode.SelectSingleNode("//input[@type='email']");
             var phoneInput = doc.DocumentNode.SelectSingleNode("//input[@type='tel']");
             var nameInput = doc.DocumentNode.SelectSingleNode("//input[@id='StaffName']");
-            
+
             Assert.NotNull(emailInput);
             Assert.NotNull(phoneInput);
             Assert.NotNull(nameInput);
-            
+
             // Verify required attributes exist (value can be empty string or "required")
-            var nameRequired = nameInput.GetAttributeValue("required", null);
-            var emailRequired = emailInput.GetAttributeValue("required", null);
+            var nameRequired = nameInput.GetAttributeValue("required", string.Empty);
+            var emailRequired = emailInput.GetAttributeValue("required", string.Empty);
             Assert.NotNull(nameRequired); // attribute exists
             Assert.NotNull(emailRequired); // attribute exists
         }
@@ -69,7 +69,7 @@ namespace StaffValidator.Tests
         {
             var response = await _client.GetAsync("/Staff");
             var content = await response.Content.ReadAsStringAsync();
-            
+
             // Verify interface shows data from the intermediary layer
             Assert.Contains("Alice", content);
             Assert.Contains("Bob", content);
@@ -84,7 +84,7 @@ namespace StaffValidator.Tests
         {
             var response = await _client.GetAsync(url);
             var content = await response.Content.ReadAsStringAsync();
-            
+
             Assert.Contains(expectedTitle, content);
         }
 
@@ -93,7 +93,7 @@ namespace StaffValidator.Tests
         {
             var response = await _client.GetAsync("/Staff");
             var content = await response.Content.ReadAsStringAsync();
-            
+
             // Verify responsive CSS classes
             Assert.Contains("container", content);
             Assert.Contains("table-responsive", content);

@@ -19,9 +19,9 @@ namespace StaffValidator.Tests
         private class TestLogger<T> : ILogger<T>
         {
             public ConcurrentBag<string> Messages { get; } = new();
-            public IDisposable BeginScope<TState>(TState state) => NullScope.Instance;
+            public IDisposable? BeginScope<TState>(TState state) where TState : notnull => NullScope.Instance;
             public bool IsEnabled(LogLevel logLevel) => true;
-            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception exception, Func<TState, Exception, string> formatter)
+            public void Log<TState>(LogLevel logLevel, EventId eventId, TState state, Exception? exception, Func<TState, Exception?, string> formatter)
             {
                 try
                 {
@@ -64,8 +64,13 @@ namespace StaffValidator.Tests
             var model = new TimeoutEmailModel { Email = new string('a', 4000) }; // long string of 'a'
             var (ok, errors) = svc.ValidateAll(model);
 
-            // We don't assert ok/invalid strictly; focus is logging of timeout path + fallback attempt.
-            Assert.Contains(logger.Messages, m => m.Contains("Regex match timeout", StringComparison.OrdinalIgnoreCase));
+            // We don't assert ok/invalid strictly; focus is that we took a protective path
+            // Accept either a true timeout or a guardrail skip on catastrophic patterns.
+            Assert.True(
+                logger.Messages.Any(m => m.Contains("Regex match timeout", StringComparison.OrdinalIgnoreCase)) ||
+                logger.Messages.Any(m => m.Contains("Guardrail: skipping regex", StringComparison.OrdinalIgnoreCase)),
+                "Expected a regex timeout or guardrail skip log, but none was found. Logs:\n" + string.Join("\n", logger.Messages)
+            );
             Assert.True(logger.Messages.Any(m => m.Contains("DFA fallback", StringComparison.OrdinalIgnoreCase)),
                 "Expected a DFA fallback log after timeout but none found. Logs:\n" + string.Join("\n", logger.Messages));
         }
