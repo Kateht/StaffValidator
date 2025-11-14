@@ -25,7 +25,7 @@ public class AuthenticationService : IAuthenticationService
     private readonly IConfiguration _configuration;
     private readonly ILogger<AuthenticationService> _logger;
     private readonly bool _requireITForPrivilegedReset;
-    
+
     // Simple in-memory store for demo purposes (in production, use proper user management)
     private static readonly List<AppUser> Users = new()
     {
@@ -45,11 +45,11 @@ public class AuthenticationService : IAuthenticationService
     public Task<AuthenticationResult> AuthenticateAsync(string username, string password)
     {
         _logger.LogInformation("🔐 Authentication attempt for user: {Username}", username);
-        
+
         try
         {
             var user = Users.FirstOrDefault(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase));
-            
+
             if (user == null)
             {
                 _logger.LogWarning("⚠️ User not found: {Username}", username);
@@ -64,7 +64,7 @@ public class AuthenticationService : IAuthenticationService
 
             var token = GenerateJwtToken(user);
             _logger.LogInformation("✅ Authentication successful for user: {Username}", username);
-            
+
             return Task.FromResult(new AuthenticationResult(true, Token: token));
         }
         catch (Exception ex)
@@ -77,7 +77,7 @@ public class AuthenticationService : IAuthenticationService
     public Task<AuthenticationResult> RegisterAsync(string username, string email, string password, string role = "User")
     {
         _logger.LogInformation("📝 Registration attempt for user: {Username}", username);
-        
+
         try
         {
             if (Users.Any(u => u.Username.Equals(username, StringComparison.OrdinalIgnoreCase)))
@@ -98,7 +98,7 @@ public class AuthenticationService : IAuthenticationService
 
             var token = GenerateJwtToken(newUser);
             _logger.LogInformation("✅ Registration successful for user: {Username}", username);
-            
+
             return Task.FromResult(new AuthenticationResult(true, Token: token));
         }
         catch (Exception ex)
@@ -122,7 +122,7 @@ public class AuthenticationService : IAuthenticationService
 
             if (user == null)
             {
-                return Task.FromResult((false, (string?)null, "Account doesn't exist"));
+                return Task.FromResult((false, (string?)null, (string?)"Account doesn't exist"));
             }
 
             // Non-enumeration for privileged roles (Admin/Manager)
@@ -139,12 +139,12 @@ public class AuthenticationService : IAuthenticationService
             var token = Guid.NewGuid().ToString("N");
             ResetTokens[token] = (user.Username, DateTime.UtcNow.Add(ResetTokenLifetime));
             _logger.LogInformation("🔑 Issued reset token for {Username}", user.Username);
-            return Task.FromResult((true, token, (string?)null));
+            return Task.FromResult((true, (string?)token, (string?)null));
         }
         catch (Exception ex)
         {
             _logger.LogError(ex, "💥 Error issuing reset token for {User}", usernameOrEmail);
-            return Task.FromResult((false, (string?)null, "Failed to issue reset token"));
+            return Task.FromResult((false, (string?)null, (string?)"Failed to issue reset token"));
         }
     }
 

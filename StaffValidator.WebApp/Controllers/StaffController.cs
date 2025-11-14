@@ -1,6 +1,7 @@
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Hosting;
 using StaffValidator.Core.Models;
 using StaffValidator.Core.Repositories;
 using StaffValidator.Core.Services;
@@ -9,17 +10,19 @@ using System.Text.Json;
 namespace StaffValidator.WebApp.Controllers
 {
     [Authorize] // Require authentication for all actions
-    public class StaffController : Controller
+    public partial class StaffController : Controller
     {
         private readonly IStaffRepository _repo;
         private readonly ValidatorService _validatorService;
         private readonly ILogger<StaffController> _logger;
+        private readonly IWebHostEnvironment _env;
 
-        public StaffController(IStaffRepository repo, ValidatorService validatorService, ILogger<StaffController> logger)
+        public StaffController(IStaffRepository repo, ValidatorService validatorService, ILogger<StaffController> logger, IWebHostEnvironment env)
         {
             _repo = repo;
             _validatorService = validatorService;
             _logger = logger;
+            _env = env;
         }
 
         public IActionResult Index()
@@ -53,39 +56,13 @@ namespace StaffValidator.WebApp.Controllers
             {
                 if (photo != null && photo.Length > 0)
                 {
-                    _logger.LogInformation("📸 Processing photo upload: {FileName} ({Size} bytes)",
-                        photo.FileName, photo.Length);
-
-                    // Check image format/size
-                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-                    var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
-
-                    if (!allowedExtensions.Contains(extension))
+                    if (!TrySavePhoto(photo, out var relativePath, out var error))
                     {
-                        _logger.LogWarning("🚫 Invalid file type attempted: {Extension} for staff: {StaffName}",
-                            extension, model.StaffName);
-                        ModelState.AddModelError("photo", "Only JPG, PNG, and GIF files are allowed.");
-                        TempData["Error"] = "Invalid file type. Please upload a valid image file.";
+                        ModelState.AddModelError("photo", error);
+                        TempData["Error"] = error;
                         return View(model);
                     }
-
-                    if (photo.Length > 5 * 1024 * 1024) // 5MB limit
-                    {
-                        _logger.LogWarning("📏 File too large: {Size} bytes for staff: {StaffName}",
-                            photo.Length, model.StaffName);
-                        ModelState.AddModelError("photo", "File size cannot exceed 5MB.");
-                        TempData["Error"] = "File is too large. Please upload an image smaller than 5MB.";
-                        return View(model);
-                    }
-
-                    var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-                    Directory.CreateDirectory(path);
-                    var fname = $"{Guid.NewGuid()}_{Path.GetFileName(photo.FileName)}";
-                    using var fs = new FileStream(Path.Combine(path, fname), FileMode.Create);
-                    photo.CopyTo(fs);
-                    model.PhotoPath = $"/uploads/{fname}";
-
-                    _logger.LogInformation("✅ Photo uploaded successfully: {PhotoPath}", model.PhotoPath);
+                    model.PhotoPath = relativePath;
                 }
 
                 _repo.Add(model);
@@ -151,40 +128,21 @@ namespace StaffValidator.WebApp.Controllers
                 // Handle photo upload
                 if (photo != null && photo.Length > 0)
                 {
-                    // Check image (same as Create)
-                    var allowedExtensions = new[] { ".jpg", ".jpeg", ".png", ".gif" };
-                    var extension = Path.GetExtension(photo.FileName).ToLowerInvariant();
-
-                    if (!allowedExtensions.Contains(extension))
+                    if (!TrySavePhoto(photo, out var relativePath, out var error))
                     {
-                        ModelState.AddModelError("photo", "Only JPG, PNG, and GIF files are allowed.");
-                        TempData["Error"] = "Invalid file type. Please upload a valid image file.";
-                        return View(model);
-                    }
-
-                    if (photo.Length > 5 * 1024 * 1024) // 5MB limit
-                    {
-                        ModelState.AddModelError("photo", "File size cannot exceed 5MB.");
-                        TempData["Error"] = "File is too large. Please upload an image smaller than 5MB.";
+                        ModelState.AddModelError("photo", error);
+                        TempData["Error"] = error;
                         return View(model);
                     }
 
                     // Delete old photo if exists
                     if (!string.IsNullOrEmpty(existingStaff.PhotoPath))
                     {
-                        var oldPhotoPath = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", existingStaff.PhotoPath.TrimStart('/'));
-                        if (System.IO.File.Exists(oldPhotoPath))
-                        {
-                            System.IO.File.Delete(oldPhotoPath);
-                        }
+                        var oldPhysical = Path.Combine(_env.WebRootPath ?? Path.Combine(Directory.GetCurrentDirectory(), "wwwroot"), existingStaff.PhotoPath.TrimStart('/').Replace('/', Path.DirectorySeparatorChar));
+                        try { if (System.IO.File.Exists(oldPhysical)) System.IO.File.Delete(oldPhysical); } catch { }
                     }
 
-                    var path = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot", "uploads");
-                    Directory.CreateDirectory(path);
-                    var fname = $"{Guid.NewGuid()}_{Path.GetFileName(photo.FileName)}";
-                    using var fs = new FileStream(Path.Combine(path, fname), FileMode.Create);
-                    photo.CopyTo(fs);
-                    model.PhotoPath = $"/uploads/{fname}";
+                    model.PhotoPath = relativePath;
                 }
                 else
                 {
@@ -379,6 +337,66 @@ namespace StaffValidator.WebApp.Controllers
                 _logger.LogError(ex, "💥 Unexpected error during JSON upload");
                 TempData["Error"] = "An unexpected error occurred while processing the file. Please try again.";
                 return View();
+            }
+        }
+    }
+}
+
+namespace StaffValidator.WebApp.Controllers
+{
+    public partial class StaffController
+    {
+        private static readonly HashSet<string> AllowedExtensions = new(StringComparer.OrdinalIgnoreCase)
+        {
+            ".jpg", ".jpeg", ".png", ".gif", ".webp"
+        };
+
+        private bool TrySavePhoto(IFormFile file, out string relativePath, out string error)
+        {
+            relativePath = string.Empty;
+            error = string.Empty;
+
+            try
+            {
+                var ext = Path.GetExtension(file.FileName);
+                if (string.IsNullOrWhiteSpace(ext) || !AllowedExtensions.Contains(ext))
+                {
+                    error = "Only JPG, JPEG, PNG, GIF or WEBP files are allowed.";
+                    return false;
+                }
+
+                if (file.Length > 5 * 1024 * 1024)
+                {
+                    error = "File size cannot exceed 5MB.";
+                    return false;
+                }
+
+                var webRoot = _env.WebRootPath;
+                if (string.IsNullOrWhiteSpace(webRoot))
+                {
+                    webRoot = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot");
+                }
+
+                var uploadsDir = Path.Combine(webRoot, "uploads");
+                Directory.CreateDirectory(uploadsDir);
+
+                var safeName = Path.GetFileName(file.FileName);
+                var fname = $"{Guid.NewGuid()}_{safeName}";
+                var physicalPath = Path.Combine(uploadsDir, fname);
+                using (var fs = new FileStream(physicalPath, FileMode.Create))
+                {
+                    file.CopyTo(fs);
+                }
+
+                relativePath = $"/uploads/{fname}";
+                _logger.LogInformation("✅ Photo uploaded: {File} -> {Path}", safeName, relativePath);
+                return true;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Photo upload failed: {Name}", file?.FileName);
+                error = "Failed to upload photo. Please try again.";
+                return false;
             }
         }
     }

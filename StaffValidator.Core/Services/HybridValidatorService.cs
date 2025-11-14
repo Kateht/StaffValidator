@@ -8,12 +8,10 @@ using Microsoft.Extensions.Logging;
 
 namespace StaffValidator.Core.Services
 {
-    /// <summary>
     /// Hybrid validation service: try a Regex match first (with timeout),
     /// and if that fails (invalid regex, exception or timeout) fall back
     /// to a pragmatic DFA/NFA implementation for known patterns (email, phone).
     /// Returns tuple (ok, errors).
-    /// </summary>
     public class HybridValidatorService : ValidatorService
     {
         private readonly ValidatorService _regexService = new();
@@ -21,12 +19,12 @@ namespace StaffValidator.Core.Services
 
         private readonly int _maxConcurrentRegexMatches;
 
-        // Default timeout for regex matching in milliseconds (can be overridden via options)
+        // Default timeout for regex matching in milliseconds 
         public int RegexTimeoutMs { get; set; } = 200;
 
         private readonly System.Threading.SemaphoreSlim _semaphore;
         private readonly ILogger<HybridValidatorService> _logger;
-    private readonly bool _enableDfaFallback = true;
+        private readonly bool _enableDfaFallback = true;
 
         public HybridValidatorService(IOptions<HybridValidationOptions> options, ILogger<HybridValidatorService> logger)
         {
@@ -127,22 +125,22 @@ namespace StaffValidator.Core.Services
                         try { _semaphore.Release(); } catch { }
                     }
                 }
-                    catch (ArgumentException)
+                catch (ArgumentException)
                 {
                     // invalid regex - try DFA fallback
-                        _logger?.LogWarning("Invalid regex for property {Property}: {Pattern}.", p.Name, attr.Pattern);
-                        if (_enableDfaFallback)
+                    _logger?.LogWarning("Invalid regex for property {Property}: {Pattern}.", p.Name, attr.Pattern);
+                    if (_enableDfaFallback)
+                    {
+                        bool fallbackOk = TryDfaFallback(attr, value);
+                        if (!fallbackOk)
                         {
-                            bool fallbackOk = TryDfaFallback(attr, value);
-                            if (!fallbackOk)
-                            {
-                                errors.Add($"{p.Name}: invalid regex/format ({attr.Pattern})");
-                            }
+                            errors.Add($"{p.Name}: invalid regex/format ({attr.Pattern})");
                         }
-                        else
-                        {
-                            errors.Add($"{p.Name}: invalid regex ({attr.Pattern})");
-                        }
+                    }
+                    else
+                    {
+                        errors.Add($"{p.Name}: invalid regex ({attr.Pattern})");
+                    }
                 }
                 catch (RegexMatchTimeoutException)
                 {

@@ -83,7 +83,7 @@
                                 <label class="form-label fw-medium">
                                     <i class="bi bi-camera text-warning me-1"></i>Profile Photo
                                 </label>
-                                <div class="border rounded p-3 text-center bg-light" style="min-height: 200px;">
+                                <div id="photoUploadCard" class="border rounded p-3 text-center bg-light" style="min-height: 200px;">
                                     <div id="photoPreview" style="@(string.IsNullOrEmpty(Model.PhotoPath) ? "display: none;" : "")">
                                         <img id="previewImage" src="@Model.PhotoPath" alt="Current photo" class="img-fluid rounded mb-2" style="max-height: 150px;" />
                                         <div>
@@ -97,7 +97,7 @@
                                         <p class="text-muted mb-2">Click to upload new photo</p>
                                         <small class="text-muted">JPG, PNG, GIF up to 5MB</small>
                                     </div>
-                                    <input type="file" name="photo" class="form-control" accept="image/*" id="photoInput" style="display: none;" />
+                                    <input type="file" name="photo" class="form-control" accept="image/*,.webp,.png,.jpg,.jpeg,.gif" id="photoInput" style="display: none;" />
                                 </div>
                             </div>
                         </div>
@@ -132,7 +132,8 @@ document.addEventListener('DOMContentLoaded', function() {
     const previewImage = document.getElementById('previewImage');
 
     // Make the entire photo area clickable
-    document.querySelector('.bg-light').addEventListener('click', function(e) {
+    const clickable = document.getElementById('photoUploadCard');
+    if (clickable) clickable.addEventListener('click', function(e) {
         if (e.target !== photoInput && !e.target.closest('button')) {
             photoInput.click();
         }

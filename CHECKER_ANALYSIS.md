@@ -3,6 +3,7 @@
 ## 📋 Yêu cầu đề bài
 
 > **Build a checker app for the web app. The second app should:**
+>
 > 1. Verify the layer that plays as an intermediary between the data to be presented and the interface.
 > 2. Verify the interface layer.
 
@@ -12,15 +13,15 @@
 
 ```
 ┌─────────────────────────────────────────────────────┐
-│ INTERFACE LAYER (Presentation)                      │  ← Yêu cầu 2
+│ INTERFACE LAYER (Presentation)                      │
 │ - MVC Views (Razor)                                  │
 │ - Controllers (StaffController, AuthController)     │
 │ - HTTP Endpoints (/, /Staff, /Staff/Create, etc.)   │
-│ - Forms & Client-side validation                    │
+│ - Forms & Client-side validation (UI check by SeleniumTests)│
 └─────────────────────────────────────────────────────┘
                       ↕
 ┌─────────────────────────────────────────────────────┐
-│ INTERMEDIARY LAYER (Business Logic)                 │  ← Yêu cầu 1
+│ INTERMEDIARY LAYER (Business Logic)                 │
 │ - ValidatorService (Regex-based validation)         │
 │ - HybridValidatorService (Regex + NFA fallback)     │
 │ - AuthenticationService (JWT + BCrypt)              │
@@ -30,9 +31,9 @@
 └─────────────────────────────────────────────────────┘
                       ↕
 ┌─────────────────────────────────────────────────────┐
-│ DATA LAYER                                           │
-│ - staff_records.json (File-based storage)           │
-│ - Staff Models                                       │
+│ DATA LAYER                                          │
+│ - Table Staff in SQL Server                         │
+│ - Staff Models                                      │
 └─────────────────────────────────────────────────────┘
 ```
 
@@ -43,11 +44,13 @@
 ### 1️⃣ **Intermediary Layer Verification** ✅ ĐẠT YÊU CẦU
 
 #### Mode: `RunDataChecks()` (Default)
+
 ```bash
 dotnet run --project StaffValidator.Checker
 ```
 
 **Kiểm tra:**
+
 - ✅ **ValidatorService**: Validate tất cả staff records với HybridValidatorService
 - ✅ **Email NFA**: Kiểm tra email với `AutomataFactory.BuildEmailNfa()`
 - ✅ **Phone NFA**: Kiểm tra phone với `AutomataFactory.BuildPhoneNfa()`
@@ -59,10 +62,12 @@ dotnet run --project StaffValidator.Checker
 - ✅ **Report generation**: Xuất JSON report với `--output`
 
 **Exit codes:**
+
 - `0` = Tất cả data hợp lệ, không có mismatch
 - `2` = Phát hiện mismatch (data validation failed)
 
 **Kết quả thực tế:**
+
 ```
 === StaffValidator Checker ===
 [Warning] ⚠️ DFA fallback result | pattern=^[A-Za-z0-9]+... | inputLength=12
@@ -77,13 +82,15 @@ Completed verification. Total mismatches: 2
 ### 2️⃣ **Interface Layer Verification** ✅ ĐẠT YÊU CẦU
 
 #### Mode 1: API Endpoints - `--http-check`
+
 ```bash
 dotnet run --project StaffValidator.Checker -- --http-check http://localhost:5000
 ```
 
 **Kiểm tra:**
+
 - ✅ **API Authentication**: `/api/auth/login` với JWT token
-- ✅ **API Endpoints**: 
+- ✅ **API Endpoints**:
   - GET `/` (Home page)
   - GET `/swagger` (API docs)
   - GET `/api/staff` (List staff - JSON schema validation)
@@ -92,26 +99,30 @@ dotnet run --project StaffValidator.Checker -- --http-check http://localhost:500
 - ✅ **Auth Flow**: Bearer token attachment và 401/403 handling
 
 **Exit codes:**
+
 - `0` = Tất cả HTTP checks passed
 - `3` = HTTP failures hoặc authentication failed
 
 #### Mode 2: UI Layer - `--ui-check` 🆕
+
 ```bash
 dotnet run --project StaffValidator.Checker -- --ui-check http://localhost:5000 --username admin --password admin123
 ```
 
 **Kiểm tra:**
+
 - ✅ **MVC Views rendering**:
   - `/` - Home/Index page (contains "Staff Management")
   - `/Staff` - Staff list page
   - `/Staff/Create` - Create form
   - `/Auth/Login` - Login page
 - ✅ **Form elements**: Verify required fields exist (StaffName, Email, PhoneNumber)
-- ✅ **CSRF Protection**: Extract và validate __RequestVerificationToken
+- ✅ **CSRF Protection**: Extract và validate \_\_RequestVerificationToken
 - ✅ **Form-based authentication**: Cookie-based login flow
 - ✅ **HTML content validation**: Check expected text exists
 
 **Exit codes:**
+
 - `0` = All UI checks passed
 - `5` = UI verification failures
 
@@ -120,6 +131,7 @@ dotnet run --project StaffValidator.Checker -- --ui-check http://localhost:5000 
 ### 3️⃣ **Performance Testing** 🎁 BONUS
 
 #### Mode: `--perf`
+
 ```bash
 dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000 \
   --endpoint /api/staff \
@@ -131,6 +143,7 @@ dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000 \
 ```
 
 **Kiểm tra:**
+
 - ✅ Load testing với concurrent requests
 - ✅ Latency metrics (avg, p50, p95, p99)
 - ✅ RPS (Requests per second)
@@ -138,11 +151,13 @@ dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000 \
 - ✅ Error rate tracking
 
 **Safety guardrails:**
+
 - Mặc định cap concurrency ≤ 50
 - Mặc định cap duration ≤ 60s
 - Cần `--confirm-perf` để vượt giới hạn
 
 **Exit codes:**
+
 - `0` = No errors during perf test
 - `4` = Errors detected (5xx, timeouts, etc.)
 
@@ -150,17 +165,17 @@ dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000 \
 
 ## 📊 So Sánh: Checker vs Tests
 
-| Khía cạnh | Checker | Test Suite | Cần thiết? |
-|-----------|---------|------------|------------|
-| **Intermediary Layer Validation** | ✅ End-to-end với real data | ✅ Unit tests isolated | **CẢ HAI** |
-| **Interface Layer - API** | ✅ HTTP smoke tests | ✅ Integration tests với WebApplicationFactory | **CẢ HAI** |
-| **Interface Layer - UI** | ✅ HTML rendering verification | ✅ InterfaceVerificationTests (HtmlAgilityPack) | **CẢ HAI** |
-| **Unit testing** | ❌ Không test isolated units | ✅ Test từng component riêng lẻ | **TESTS** |
-| **Regression testing** | ⚠️ Limited coverage | ✅ Comprehensive edge cases | **TESTS** |
-| **CI/CD Fast Feedback** | ⚠️ Cần start app (chậm) | ✅ In-memory, nhanh | **TESTS** |
-| **Code Coverage** | ❌ Không có metrics | ✅ Coverage report | **TESTS** |
-| **Production Monitoring** | ✅ Có thể chạy định kỳ | ❌ Không phù hợp | **CHECKER** |
-| **Stress Testing** | ✅ Performance mode | ❌ Không có | **CHECKER** |
+| Khía cạnh                         | Checker                        | Test Suite                                      | Cần thiết?  |
+| --------------------------------- | ------------------------------ | ----------------------------------------------- | ----------- |
+| **Intermediary Layer Validation** | ✅ End-to-end với real data    | ✅ Unit tests isolated                          | **CẢ HAI**  |
+| **Interface Layer - API**         | ✅ HTTP smoke tests            | ✅ Integration tests với WebApplicationFactory  | **CẢ HAI**  |
+| **Interface Layer - UI**          | ✅ HTML rendering verification | ✅ InterfaceVerificationTests (HtmlAgilityPack) | **CẢ HAI**  |
+| **Unit testing**                  | ❌ Không test isolated units   | ✅ Test từng component riêng lẻ                 | **TESTS**   |
+| **Regression testing**            | ⚠️ Limited coverage            | ✅ Comprehensive edge cases                     | **TESTS**   |
+| **CI/CD Fast Feedback**           | ⚠️ Cần start app (chậm)        | ✅ In-memory, nhanh                             | **TESTS**   |
+| **Code Coverage**                 | ❌ Không có metrics            | ✅ Coverage report                              | **TESTS**   |
+| **Production Monitoring**         | ✅ Có thể chạy định kỳ         | ❌ Không phù hợp                                | **CHECKER** |
+| **Stress Testing**                | ✅ Performance mode            | ❌ Không có                                     | **CHECKER** |
 
 ---
 
@@ -169,12 +184,14 @@ dotnet run --project StaffValidator.Checker -- --perf http://localhost:5000 \
 ### ✅ **Checker ĐÃ ĐẠT YÊU CẦU**
 
 **Yêu cầu 1: Verify Intermediary Layer** ✅
+
 - `RunDataChecks()` kiểm tra toàn bộ business logic layer
 - Validate với HybridValidatorService + NFA
 - Cross-validation 3 phương pháp
 - Detect mismatches và report
 
 **Yêu cầu 2: Verify Interface Layer** ✅
+
 - `RunHttpChecksAsync()` - API endpoints verification
 - `RunUiChecksAsync()` - MVC Views & Forms verification
 - Authentication flow testing
@@ -212,6 +229,7 @@ Checker **KHÔNG thể thay thế** Tests vì:
 ## 📝 Sử Dụng Checker
 
 ### 1. Verify Data & Intermediary Layer
+
 ```bash
 # Mặc định: data validation
 dotnet run --project StaffValidator.Checker
@@ -221,6 +239,7 @@ dotnet run --project StaffValidator.Checker -- --output data-report.json
 ```
 
 ### 2. Verify API Interface
+
 ```bash
 # Basic API check
 dotnet run --project StaffValidator.Checker -- --http-check http://localhost:5000
@@ -233,6 +252,7 @@ dotnet run --project StaffValidator.Checker -- \
 ```
 
 ### 3. Verify UI Interface 🆕
+
 ```bash
 # UI layer verification
 dotnet run --project StaffValidator.Checker -- \
@@ -242,6 +262,7 @@ dotnet run --project StaffValidator.Checker -- \
 ```
 
 ### 4. Performance Testing
+
 ```bash
 # Safe stress test
 dotnet run --project StaffValidator.Checker -- \
@@ -265,7 +286,7 @@ dotnet run --project StaffValidator.Checker -- \
 
 - name: Start Web App
   run: dotnet run --project StaffValidator.WebApp &
-  
+
 - name: Wait for app
   run: sleep 10
 
@@ -296,6 +317,7 @@ dotnet run --project StaffValidator.Checker -- \
 🎁 Bonus: Performance Testing
 
 **Test Suite** vẫn **CẦN THIẾT** để:
+
 - Unit testing riêng lẻ
 - Regression prevention
 - Fast CI/CD feedback
